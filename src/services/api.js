@@ -65,6 +65,7 @@ const apiRequest = async (endpoint, options = {}) => {
   // Build fetch config safely: merge options but normalize cache flag
   const baseConfig = {
     headers: createHeaders(options.auth !== false),
+    mode: 'cors',
     ...options,
   };
   const config = { ...baseConfig };
