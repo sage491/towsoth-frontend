@@ -108,7 +108,7 @@ const ModernLandingPage = () => {
             </div>
             
             <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl font-bold mb-4 sm:mb-6 bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent zoom-text">
-              Master You MST With
+              Save Your Scholarship With
               <br />
               TOWSOTH
             </h1>
