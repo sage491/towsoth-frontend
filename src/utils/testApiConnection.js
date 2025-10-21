@@ -141,23 +141,76 @@ export const testApiEndpoints = async (endpoints = ['/auth/profile', '/subjects'
 };
 
 // Export a function to run all tests
-export const runApiTests = async () => {
+export const testLoginEndpoint = async (email, password) => {
+  const startTime = performance.now();
+  const result = {
+    endpoint: '/auth/login',
+    success: false,
+    statusCode: null,
+    responseTime: 0,
+    error: null,
+    data: null,
+  };
+
+  try {
+    const response = await fetch(`${API_CONFIG.BASE_URL}/auth/login`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ email, password }),
+      signal: AbortSignal.timeout(5000),
+    });
+
+    const endTime = performance.now();
+    result.responseTime = Math.round(endTime - startTime);
+    result.statusCode = response.status;
+
+    let data = null;
+    try {
+      data = await response.json();
+    } catch (parseErr) {
+      // Non-JSON error body
+      data = null;
+    }
+    result.data = data;
+
+    if (response.ok && data && (data.token || data.success)) {
+      result.success = true;
+    } else {
+      result.success = false;
+      result.error = data?.message || data?.error || `Status ${response.status}: ${response.statusText}`;
+    }
+  } catch (error) {
+    const endTime = performance.now();
+    result.responseTime = Math.round(endTime - startTime);
+    result.success = false;
+    result.error = error.name === 'AbortError' ? 'Connection timed out' : (error.message || 'Unknown error');
+  }
+
+  return result;
+};
+export const runApiTests = async (credentials = null) => {
   console.group('API Connection Tests');
-  
-  // Test basic connection
   const connectionResult = await testApiConnection();
-  
-  // Only test endpoints if basic connection succeeded
   let endpointResults = null;
+  let loginResult = null;
+
+  // If credentials provided, test login explicitly
+  if (credentials && credentials.email && credentials.password) {
+    loginResult = await testLoginEndpoint(credentials.email, credentials.password);
+  }
+
+  // Only test endpoints if basic connection succeeded
   if (connectionResult.success) {
     endpointResults = await testApiEndpoints();
   }
-  
   console.groupEnd();
-  
+
   return {
     connection: connectionResult,
-    endpoints: endpointResults
+    login: loginResult,
+    endpoints: endpointResults,
   };
 };
 

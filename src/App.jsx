@@ -11,7 +11,8 @@ import VideoViewer from '@/pages/VideoViewer'
 import FullscreenPDFViewer from '@/pages/FullscreenPDFViewer'
 import ThemeAwareProgressTracker from '@/pages/ThemeAwareProgressTracker'
 import ProfilePage from '@/pages/ProfilePage'
-import AdminPage from '@/pages/AdminPage'
+// Removed direct import of AdminPage to avoid early loading and aborted requests
+// import AdminPage from '@/pages/AdminPage'
 import AdminLoginPage from '@/pages/AdminLoginPage'
 import ForgotPassword from '@/pages/ForgotPassword'
 import ResetPassword from '@/pages/ResetPassword'
@@ -20,6 +21,10 @@ import ProtectedRoute from '@/components/ProtectedRoute'
 import { useContext } from 'react'
 import { AuthContext } from '@/contexts/AuthContext'
 import { ThemeProvider } from '@/contexts/ThemeContext'
+import { lazy, Suspense } from 'react'
+
+// Lazy-load AdminPage so it only loads for authorized users when rendered
+const AdminPage = lazy(() => import('@/pages/AdminPage'))
 
 // Protected Route Component for Admin
 const ProtectedAdminRoute = ({ children }) => {
@@ -93,7 +98,9 @@ function App() {
           <Route path="/admin-login" element={<AdminLoginPage />} />
           <Route path="/admin" element={
             <ProtectedAdminRoute>
-              <AdminPage />
+              <Suspense fallback={<div className="p-8 text-center">Loading admin...</div>}>
+                <AdminPage />
+              </Suspense>
             </ProtectedAdminRoute>
           } />
           <Route path="/api-test" element={<ApiTestPage />} />

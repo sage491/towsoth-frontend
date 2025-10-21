@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { subjectsAPI, adminAPI, announcementsAPI, notesAPI, videosAPI } from '@/services/api'
+import { subjectsAPI, adminAPI, announcementsAPI, notesAPI, videosAPI, streamsAPI } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { 
   ArrowLeft, 
@@ -31,7 +31,7 @@ import OwlLogo from '@/components/OwlLogo'
 
 const AdminPage = () => {
   const navigate = useNavigate()
-  const { logout } = useAuth()
+  const { logout, user } = useAuth()
   const [subjects, setSubjects] = useState([])
   const [stats, setStats] = useState({
     totalSubjects: 0,
@@ -62,8 +62,123 @@ const AdminPage = () => {
     name: '',
     description: '',
     year: '',
-    subjectType: ''
+    subjectType: '',
+    stream: ''
   })
+
+  // Add missing form states for notes and videos
+  const [newNote, setNewNote] = useState({
+    title: '',
+    description: '',
+    type: 'pdf',
+    url: '',
+    subject: ''
+  })
+  const [newVideo, setNewVideo] = useState({
+    title: '',
+    description: '',
+    youtubeId: '',
+    duration: '',
+    subject: ''
+  })
+
+  // Streams state
+  const [streams, setStreams] = useState([])
+  const [newStreamName, setNewStreamName] = useState('')
+  const [editingStreamId, setEditingStreamId] = useState(null)
+  const [editingStreamName, setEditingStreamName] = useState('')
+  const canManageStreams = (user?.role === 'admin')
+
+  useEffect(() => {
+    const loadStreams = async () => {
+      try {
+        const res = await streamsAPI.getAll()
+        const arr = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+        setStreams(arr)
+      } catch (e) {
+        console.error('Failed to fetch streams:', e)
+      }
+    }
+    loadStreams()
+  }, [])
+
+  const handleAddStream = async (e) => {
+    e.preventDefault()
+    const name = (newStreamName || '').trim()
+    if (!name) {
+      setErrorMessage('Please enter a stream name')
+      return
+    }
+    if (!canManageStreams) {
+      setErrorMessage('Admins only: cannot add streams')
+      return
+    }
+    setErrorMessage('')
+    try {
+      await streamsAPI.create({ name })
+      setStreams(prev => ([...(Array.isArray(prev) ? prev : []), { name }]))
+      setNewStreamName('')
+      setSuccessMessage('Stream added successfully!')
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to add stream')
+    }
+  }
+
+  const startEditStream = (s) => {
+    const id = s?._id || s?.id || s?.name
+    const name = s?.name || s?.title || ''
+    setEditingStreamId(id)
+    setEditingStreamName(name)
+  }
+
+  const cancelEditStream = () => {
+    setEditingStreamId(null)
+    setEditingStreamName('')
+  }
+
+  const handleUpdateStream = async (e) => {
+    e?.preventDefault?.()
+    if (!canManageStreams) {
+      setErrorMessage('Admins only: cannot update streams')
+      return
+    }
+    const id = editingStreamId
+    const name = (editingStreamName || '').trim()
+    if (!id || !name) {
+      setErrorMessage('Provide a valid stream name')
+      return
+    }
+    try {
+      await streamsAPI.update(id, { name })
+      setStreams(prev => (Array.isArray(prev) ? prev.map(s => {
+        const sid = s?._id || s?.id || s?.name
+        if (sid === id) return { ...s, name }
+        return s
+      }) : prev))
+      setSuccessMessage('Stream updated')
+      cancelEditStream()
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to update stream')
+    }
+  }
+
+  const handleDeleteStream = async (idOrName) => {
+    if (!canManageStreams) {
+      setErrorMessage('Admins only: cannot delete streams')
+      return
+    }
+    try {
+      await streamsAPI.delete(idOrName)
+      setStreams(prev => (Array.isArray(prev) ? prev.filter(s => {
+        const sid = s?._id || s?.id || s?.name
+        return sid !== idOrName
+      }) : prev))
+      setSuccessMessage('Stream deleted')
+      if (editingStreamId === idOrName) cancelEditStream()
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to delete stream')
+    }
+  }
 
   const [announcements, setAnnouncements] = useState([])
   const [newAnnouncement, setNewAnnouncement] = useState({
@@ -71,7 +186,6 @@ const AdminPage = () => {
     content: '',
     date: new Date().toISOString().split('T')[0]
   })
-  
   const [subjectFieldRequired, setSubjectFieldRequired] = useState(false)
   const [successMessage, setSuccessMessage] = useState('')
   const [errorMessage, setErrorMessage] = useState('')
@@ -82,7 +196,8 @@ const AdminPage = () => {
     name: '',
     description: '',
     year: '',
-    subjectType: ''
+    subjectType: '',
+    stream: ''
   })
 
   // Per-subject notes for Manage Content
@@ -491,7 +606,8 @@ const AdminPage = () => {
         name: '',
         description: '',
         year: '',
-        subjectType: ''
+        subjectType: '',
+        stream: ''
       })
       
       // Refresh subjects data
@@ -524,16 +640,21 @@ const AdminPage = () => {
       name: subject.name || '',
       description: subject.description || '',
       year: subject.year || '',
-      subjectType: subject.subjectType || ''
+      subjectType: subject.subjectType || '',
+      stream: subject.stream || ''
     })
   }
 
   const cancelEditSubject = () => {
     setEditingSubjectId(null)
-    setEditSubject({ name: '', description: '', year: '', subjectType: '' })
+    setEditSubject({ name: '', description: '', year: '', subjectType: '', stream: '' })
   }
 
   const handleEditSubjectSubmit = async (e) => {
+
+
+
+
     e.preventDefault()
     try {
       setErrorMessage('')
@@ -569,6 +690,7 @@ const AdminPage = () => {
   }
 
   const handleDeleteSubject = async (id) => {
+
     try {
       setErrorMessage('')
       const confirmed = window.confirm('Delete this subject and all its content? This cannot be undone.')
@@ -604,6 +726,9 @@ const AdminPage = () => {
   }
 
   return (
+
+
+
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-card border-b shadow-sm">
@@ -712,8 +837,9 @@ const AdminPage = () => {
 
         {/* Content Management Tabs */}
           <Tabs defaultValue="add-subject" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-7">
+            <TabsList className="grid w-full grid-cols-8">
               <TabsTrigger value="add-subject">Add Subject</TabsTrigger>
+              <TabsTrigger value="manage-streams">Manage Streams</TabsTrigger>
               <TabsTrigger value="upload-content">Upload Content</TabsTrigger>
               <TabsTrigger value="add-assignment">Assignments</TabsTrigger>
               <TabsTrigger value="manage-content">Manage Content</TabsTrigger>
@@ -721,6 +847,88 @@ const AdminPage = () => {
               <TabsTrigger value="settings">Settings</TabsTrigger>
           </TabsList>
           
+          {/* Manage Streams Tab */}
+          <TabsContent value="manage-streams">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <OwlLogo className="h-5 w-5" color="#3b82f6" />
+                  <span>Manage Streams</span>
+                </CardTitle>
+                <CardDescription>
+                  Add streams to organize subjects; these appear in Add Subject.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleAddStream} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="stream-name">Stream Name</Label>
+                    <Input
+                      id="stream-name"
+                      placeholder="e.g. Science, Commerce, Arts"
+                      value={newStreamName}
+                      onChange={(e) => setNewStreamName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add Stream
+                  </Button>
+                </form>
+                <div className="mt-6">
+                  <h3 className="text-sm font-medium mb-2">Existing Streams</h3>
+                  {Array.isArray(streams) && streams.length > 0 ? (
+                    <div className="space-y-2">
+                      {streams.map((s) => {
+                        const name = s?.name || s?.title || (typeof s === 'string' ? s : '')
+                        const key = s?._id || s?.id || name
+                        const sid = key
+                        const isEditing = editingStreamId === sid
+                        return (
+                          <div key={key} className="flex items-center gap-2">
+                            {isEditing ? (
+                              <>
+                                <Input
+                                  value={editingStreamName}
+                                  onChange={(e) => setEditingStreamName(e.target.value)}
+                                  className="max-w-xs"
+                                  disabled={!canManageStreams}
+                                />
+                                <Button size="sm" onClick={handleUpdateStream} disabled={!canManageStreams}>
+                                  <Save className="h-4 w-4 mr-1" /> Save
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={cancelEditStream}>
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="px-2 py-1 border rounded text-sm">{name}</span>
+                                {canManageStreams && (
+                                  <>
+                                    <Button size="sm" variant="ghost" onClick={() => startEditStream(s)}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleDeleteStream(sid)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No streams yet. Add one above.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Announcements Tab */}
           <TabsContent value="announcements">
             <Card>
@@ -883,6 +1091,30 @@ const AdminPage = () => {
                       onChange={(e) => setNewSubject({ ...newSubject, subjectType: e.target.value })}
                       required
                     />
+                  </div>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="subject-stream">Stream</Label>
+                    <Select
+                      value={newSubject.stream || ""}
+                      onValueChange={(value) => setNewSubject({ ...newSubject, stream: value === "none" ? "" : value })}
+                      disabled={!streams || streams.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={(!streams || streams.length === 0) ? 'No streams available' : 'Select stream'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No stream</SelectItem>
+                        {(streams || []).map((s) => {
+                          const name = s?.name || s?.title || (typeof s === 'string' ? s : '')
+                          const key = s?._id || s?.id || name
+                          if (!name) return null
+                          return (
+                            <SelectItem key={key} value={name}>{name}</SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
                   </div>
                   
                   <Button type="submit" className="w-full">
@@ -1085,14 +1317,39 @@ const AdminPage = () => {
                               onChange={(e) => setEditSubject({ ...editSubject, description: e.target.value })}
                             />
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor={`edit-type-${subject._id || subject.id}`}>Subject Type</Label>
-                            <Input
-                              id={`edit-type-${subject._id || subject.id}`}
-                              placeholder="e.g. Core, Elective"
-                              value={editSubject.subjectType}
-                              onChange={(e) => setEditSubject({ ...editSubject, subjectType: e.target.value })}
-                            />
+                          <div className="grid md:grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                              <Label htmlFor={`edit-type-${subject._id || subject.id}`}>Subject Type</Label>
+                              <Input
+                                id={`edit-type-${subject._id || subject.id}`}
+                                placeholder="e.g. Core, Elective"
+                                value={editSubject.subjectType}
+                                onChange={(e) => setEditSubject({ ...editSubject, subjectType: e.target.value })}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor={`edit-stream-${subject._id || subject.id}`}>Stream</Label>
+                              <Select
+                                value={editSubject.stream || ""}
+                                onValueChange={(value) => setEditSubject({ ...editSubject, stream: value === "none" ? "" : value })}
+                                disabled={!streams || streams.length === 0}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={(!streams || streams.length === 0) ? 'No streams available' : 'Select stream'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No stream</SelectItem>
+                                  {(streams || []).map((s) => {
+                                    const name = s?.name || s?.title || (typeof s === 'string' ? s : '')
+                                    const key = s?._id || s?.id || name
+                                    if (!name) return null
+                                    return (
+                                      <SelectItem key={key} value={name}>{name}</SelectItem>
+                                    )
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </div>
                           </div>
                           <div className="flex items-center space-x-2">
                             <Button type="submit" className="flex items-center space-x-2">
@@ -1159,6 +1416,8 @@ const AdminPage = () => {
         </Tabs>
       </div>
     </div>
+
+
   )
 }
 

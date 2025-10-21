@@ -1,4 +1,6 @@
 import { API_CONFIG } from '@/config/api';
+import { readJSONFromSupabase, writeJSONToSupabase } from '@/services/supabase'
+import { listStreams, createStream as createStreamDB, updateStream as updateStreamDB, deleteStream as deleteStreamDB } from '@/services/streamsRepo'
 
 // API Base URL - Using the configured base URL
 const API_BASE_URL = API_CONFIG.BASE_URL;
@@ -718,3 +720,169 @@ export const getUserProfile = () => {
 export const isAuthenticated = () => {
   return !!getAuthToken();
 };
+
+export const streamsAPI = {
+  getAll: async (options = {}) => {
+    try {
+      return await apiRequest('/streams', options)
+    } catch (err) {
+      const msg = String(err?.message || '')
+      const isNotFound = msg.includes('404')
+      const isNetwork = /failed to fetch|TypeError: Failed to fetch|network|timeout|cors/i.test(msg)
+      // Fallbacks on missing endpoint or network/CORS issues
+      if (isNotFound || isNetwork) {
+        // First fallback: Supabase DB table `streams`
+        try {
+          const rows = await listStreams()
+          return rows
+        } catch (dbErr) {
+          // Secondary: admin route
+          try {
+            return await apiRequest('/admin/streams', options)
+          } catch (err2) {
+            // Final fallback: Supabase JSON or localStorage
+            const path = 'streams/streams.json'
+            let list = null
+            try { list = await readJSONFromSupabase(path) } catch {}
+            if (!list) {
+              try {
+                const raw = localStorage.getItem('streams-list')
+                list = raw ? JSON.parse(raw) : []
+              } catch { list = [] }
+            }
+            // Normalize to array output for callers
+            return Array.isArray(list) ? list : []
+          }
+        }
+      }
+      throw err
+    }
+  },
+  getById: async (id) => {
+    try {
+      return await apiRequest(`/streams/${id}`)
+    } catch (err) {
+      // Fallback: read from JSON/local
+      const path = 'streams/streams.json'
+      let list = null
+      try { list = await readJSONFromSupabase(path) } catch {}
+      if (!list) {
+        try {
+          const raw = localStorage.getItem('streams-list')
+          list = raw ? JSON.parse(raw) : []
+        } catch { list = [] }
+      }
+      const found = (Array.isArray(list) ? list : []).find(s => (s._id || s.id) === id || s.name === id)
+      if (!found) throw err
+      return found
+    }
+  },
+  create: async (data) => {
+    const payload = typeof data === 'string' ? { name: data } : data
+    try {
+      return await apiRequest('/admin/streams', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      })
+    } catch (err) {
+      const msg = String(err?.message || '')
+      const isNotFound = msg.includes('404')
+      const isNetwork = /failed to fetch|TypeError: Failed to fetch|network|timeout|cors/i.test(msg)
+      if (!isNotFound && !isNetwork) throw err
+      // Try Supabase DB table first
+      try {
+        const row = await createStreamDB(payload.name)
+        return { success: true, data: row }
+      } catch (dbErr) {
+        // Fallback: persist to Supabase JSON or localStorage
+        const path = 'streams/streams.json'
+        let list = null
+        try { list = await readJSONFromSupabase(path) } catch {}
+        if (!Array.isArray(list)) {
+          try {
+            const raw = localStorage.getItem('streams-list')
+            list = raw ? JSON.parse(raw) : []
+          } catch { list = [] }
+        }
+        const newItem = { id: Date.now(), name: payload.name }
+        const next = [...list, newItem]
+        let ok = false
+        try { await writeJSONToSupabase(path, next); ok = true } catch {}
+        if (!ok) {
+          try { localStorage.setItem('streams-list', JSON.stringify(next)); ok = true } catch {}
+        }
+        return { success: true, data: newItem }
+      }
+    }
+  },
+  update: async (id, data) => {
+    try {
+      return await apiRequest(`/admin/streams/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      })
+    } catch (err) {
+      const msg = String(err?.message || '')
+      const isNotFound = msg.includes('404')
+      const isNetwork = /failed to fetch|TypeError: Failed to fetch|network|timeout|cors/i.test(msg)
+      if (!isNotFound && !isNetwork) throw err
+      // Try Supabase DB table first
+      try {
+        const newName = typeof data === 'string' ? data : data?.name
+        const row = await updateStreamDB(id, newName)
+        return { success: true, data: row }
+      } catch (dbErr) {
+        const path = 'streams/streams.json'
+        let list = null
+        try { list = await readJSONFromSupabase(path) } catch {}
+        if (!Array.isArray(list)) {
+          try {
+            const raw = localStorage.getItem('streams-list')
+            list = raw ? JSON.parse(raw) : []
+          } catch { list = [] }
+        }
+        const next = (list || []).map(s => ((s._id || s.id) === id || s.name === id) ? { ...s, ...data } : s)
+        let ok = false
+        try { await writeJSONToSupabase(path, next); ok = true } catch {}
+        if (!ok) {
+          try { localStorage.setItem('streams-list', JSON.stringify(next)); ok = true } catch {}
+        }
+        return { success: true }
+      }
+    }
+  },
+  delete: async (id) => {
+    try {
+      return await apiRequest(`/admin/streams/${id}`, {
+        method: 'DELETE',
+      })
+    } catch (err) {
+      const msg = String(err?.message || '')
+      const isNotFound = msg.includes('404')
+      const isNetwork = /failed to fetch|TypeError: Failed to fetch|network|timeout|cors/i.test(msg)
+      if (!isNotFound && !isNetwork) throw err
+      // Try Supabase DB table first
+      try {
+        await deleteStreamDB(id)
+        return { success: true }
+      } catch (dbErr) {
+        const path = 'streams/streams.json'
+        let list = null
+        try { list = await readJSONFromSupabase(path) } catch {}
+        if (!Array.isArray(list)) {
+          try {
+            const raw = localStorage.getItem('streams-list')
+            list = raw ? JSON.parse(raw) : []
+          } catch { list = [] }
+        }
+        const next = (list || []).filter(s => (s._id || s.id) !== id && s.name !== id)
+        let ok = false
+        try { await writeJSONToSupabase(path, next); ok = true } catch {}
+        if (!ok) {
+          try { localStorage.setItem('streams-list', JSON.stringify(next)); ok = true } catch {}
+        }
+        return { success: true }
+      }
+    }
+  },
+}

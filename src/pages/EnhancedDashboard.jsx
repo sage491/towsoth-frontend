@@ -90,6 +90,14 @@ const EnhancedDashboard = () => {
       try {
         setLoading(true)
         setError(null)
+
+        // Guard: Only students should call progress endpoints
+        if (!user || user.role !== 'student') {
+          setError('This dashboard is available to students only.')
+          setSubjects([])
+          setUserProgress(null)
+          return
+        }
         
         // Fetch enhanced dashboard data
         const response = await progressAPI.getEnhancedDashboardData()
@@ -162,7 +170,13 @@ const EnhancedDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen">
+      {/* Optional basic error display for admins */}
+      {error && (
+        <div className="p-4 mb-4 rounded-md bg-destructive/15 text-destructive border border-destructive/30">
+          {error}
+        </div>
+      )}
       {/* Header */}
       <header className="bg-card border-b border-border">
         <div className="container mx-auto px-6 py-4">

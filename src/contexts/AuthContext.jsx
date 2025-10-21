@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { authAPI, adminAPI, setAuthToken, setUserProfile, getUserProfile, isAuthenticated } from '@/services/api';
+import { signInSupabase, signOutSupabase } from '@/services/supabase'
 
 export const AuthContext = createContext();
 
@@ -111,6 +112,16 @@ export const AuthProvider = ({ children }) => {
         setUserProfile(userProfile);
         setUser(userProfile);
         setIsLoggedIn(true);
+        // Bridge Supabase auth: sign in if admin
+        try {
+          if (userProfile?.role === 'admin') {
+            await signInSupabase(email, password)
+          } else {
+            await signOutSupabase()
+          }
+        } catch (supaErr) {
+          console.warn('Supabase auth bridge failed:', supaErr?.message || supaErr)
+        }
         return { success: true, user: userProfile };
       }
       throw new Error(response.message || 'Admin login failed');
@@ -141,6 +152,8 @@ export const AuthProvider = ({ children }) => {
     authAPI.logout();
     setUser(null);
     setIsLoggedIn(false);
+    // Ensure Supabase session is cleared
+    try { signOutSupabase() } catch {}
   };
 
   const value = {

@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Eye, EyeOff, Check, X, Loader2 } from 'lucide-react'
 import OwlLogo from '@/components/OwlLogo'
 import { useAuth } from '@/contexts/AuthContext'
+import { authAPI, subjectsAPI, streamsAPI } from '@/services/api'
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false)
@@ -21,11 +22,34 @@ const SignupPage = () => {
     confirmPassword: '',
     university: '',
     year: '',
+    stream: '',
     selectedSubjects: []
   })
   const navigate = useNavigate()
   const { register } = useAuth()
+  // Add dynamic streams state
+  const [availableStreams, setAvailableStreams] = useState([])
+  const [streamsLoading, setStreamsLoading] = useState(false)
 
+  // Fetch streams from admin-managed streams list
+  useEffect(() => {
+    const fetchStreams = async () => {
+      try {
+        setStreamsLoading(true)
+        const res = await streamsAPI.getAll()
+        const arr = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+        const names = arr.map((s) => s?.name || s?.title || (typeof s === 'string' ? s : '')).filter(Boolean)
+        setAvailableStreams(names)
+      } catch (e) {
+        console.error('Failed to fetch streams:', e)
+        setAvailableStreams([])
+      } finally {
+        setStreamsLoading(false)
+      }
+    }
+    fetchStreams()
+  }, [])
+  // Deprecated: streams are now fetched from streamsAPI above.
   // No subject fetching during signup; users can select subjects later in Profile
   
   const handleSubmit = async (e) => {
@@ -33,6 +57,11 @@ const SignupPage = () => {
     
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match!')
+      return
+    }
+    // Require stream selection
+    if (!formData.stream) {
+      setError('Please select a stream')
       return
     }
     
@@ -45,6 +74,12 @@ const SignupPage = () => {
       
       const result = await register(userData)
       if (result.success) {
+        try {
+          // Ensure stream is persisted on the profile
+          await authAPI.updateProfile({ stream: formData.stream })
+        } catch (profileErr) {
+          console.warn('Stream persistence failed; proceeding:', profileErr)
+        }
         navigate('/dashboard')
       } else {
         setError(result.error || 'Registration failed')
@@ -208,6 +243,28 @@ const SignupPage = () => {
                   disabled={loading}
                   required
                 />
+              </div>
+              
+              {/* Stream selection */}
+              <div className="space-y-2">
+                <Label htmlFor="stream">Stream</Label>
+                <Select 
+                  value={formData.stream}
+                  onValueChange={(value) => handleSelectChange('stream', value)}
+                  disabled={loading || streamsLoading || availableStreams.length === 0}
+                >
+                  <SelectTrigger disabled={loading || streamsLoading || availableStreams.length === 0}>
+                    <SelectValue placeholder={streamsLoading ? 'Loading streams...' : (availableStreams.length === 0 ? 'No streams available yet' : 'Select your stream')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableStreams.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {availableStreams.length === 0 && !streamsLoading && (
+                  <p className="text-xs text-muted-foreground">Streams appear when admins upload content tied to a stream.</p>
+                )}
               </div>
               
               <div className="space-y-2">
