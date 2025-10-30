@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Eye, EyeOff, Check, X, Loader2 } from 'lucide-react'
 import OwlLogo from '@/components/OwlLogo'
 import { useAuth } from '@/contexts/AuthContext'
-import { authAPI, subjectsAPI, streamsAPI } from '@/services/api'
+import { authAPI, subjectsAPI, streamsAPI, collegesAPI } from '@/services/api'
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false)
@@ -30,13 +30,22 @@ const SignupPage = () => {
   // Add dynamic streams state
   const [availableStreams, setAvailableStreams] = useState([])
   const [streamsLoading, setStreamsLoading] = useState(false)
+  // Colleges state
+  const [availableColleges, setAvailableColleges] = useState([])
+  const [collegesLoading, setCollegesLoading] = useState(false)
 
   // Fetch streams from admin-managed streams list
   useEffect(() => {
     const fetchStreams = async () => {
       try {
         setStreamsLoading(true)
-        const res = await streamsAPI.getAll()
+        const selectedUniversity = (formData.university || '').trim()
+        const hasValidUniversity = selectedUniversity && availableColleges.includes(selectedUniversity)
+        if (!hasValidUniversity) {
+          setAvailableStreams([])
+          return
+        }
+        const res = await streamsAPI.getAll({ college: selectedUniversity })
         const arr = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
         const names = arr.map((s) => s?.name || s?.title || (typeof s === 'string' ? s : '')).filter(Boolean)
         setAvailableStreams(names)
@@ -48,6 +57,27 @@ const SignupPage = () => {
       }
     }
     fetchStreams()
+  }, [formData.university, availableColleges])
+  // Deprecated: streams are now fetched from streamsAPI above.
+  // No subject fetching during signup; users can select subjects later in Profile
+
+  // Fetch colleges for university dropdown
+  useEffect(() => {
+    const fetchColleges = async () => {
+      try {
+        setCollegesLoading(true)
+        const res = await collegesAPI.getAll()
+        const arr = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+        const names = arr.map((c) => c?.name || (typeof c === 'string' ? c : '')).filter(Boolean)
+        setAvailableColleges(names)
+      } catch (e) {
+        console.error('Failed to fetch colleges:', e)
+        setAvailableColleges([])
+      } finally {
+        setCollegesLoading(false)
+      }
+    }
+    fetchColleges()
   }, [])
   // Deprecated: streams are now fetched from streamsAPI above.
   // No subject fetching during signup; users can select subjects later in Profile
@@ -232,29 +262,36 @@ const SignupPage = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="university">University</Label>
-                <Input
-                  id="university"
-                  name="university"
-                  type="text"
-                  placeholder="Enter your university"
+                <Label htmlFor="university">College</Label>
+                {/* Replace text input with admin-managed colleges dropdown */}
+                <Select 
                   value={formData.university}
-                  onChange={handleChange}
-                  disabled={loading}
-                  required
-                />
+                  onValueChange={(value) => handleSelectChange('university', value)}
+                  disabled={loading || collegesLoading || availableColleges.length === 0}
+                >
+                  <SelectTrigger disabled={loading || collegesLoading || availableColleges.length === 0}>
+                    <SelectValue placeholder={collegesLoading ? 'Loading colleges...' : (availableColleges.length === 0 ? 'No colleges available yet' : 'Select your college')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableColleges.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {availableColleges.length === 0 && !collegesLoading && (
+                  <p className="text-xs text-muted-foreground">Colleges are managed by admins in the Admin Panel.</p>
+                )}
               </div>
-              
               {/* Stream selection */}
               <div className="space-y-2">
                 <Label htmlFor="stream">Stream</Label>
                 <Select 
                   value={formData.stream}
                   onValueChange={(value) => handleSelectChange('stream', value)}
-                  disabled={loading || streamsLoading || availableStreams.length === 0}
+                  disabled={loading || streamsLoading || availableStreams.length === 0 || !formData.university}
                 >
-                  <SelectTrigger disabled={loading || streamsLoading || availableStreams.length === 0}>
-                    <SelectValue placeholder={streamsLoading ? 'Loading streams...' : (availableStreams.length === 0 ? 'No streams available yet' : 'Select your stream')} />
+                  <SelectTrigger disabled={loading || streamsLoading || availableStreams.length === 0 || !formData.university}>
+                    <SelectValue placeholder={streamsLoading ? 'Loading streams...' : (!formData.university ? 'Select college first' : (availableStreams.length === 0 ? 'No streams available yet' : 'Select your stream'))} />
                   </SelectTrigger>
                   <SelectContent>
                     {availableStreams.map((s) => (

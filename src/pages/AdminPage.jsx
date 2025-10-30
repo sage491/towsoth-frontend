@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Switch } from '@/components/ui/switch'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { subjectsAPI, adminAPI, announcementsAPI, notesAPI, videosAPI, streamsAPI } from '@/services/api'
+import { subjectsAPI, adminAPI, announcementsAPI, notesAPI, videosAPI, streamsAPI, collegesAPI } from '@/services/api'
 import { useAuth } from '@/contexts/AuthContext'
 import { 
   ArrowLeft, 
@@ -63,7 +63,8 @@ const AdminPage = () => {
     description: '',
     year: '',
     subjectType: '',
-    stream: ''
+    stream: '',
+    college: ''
   })
 
   // Add missing form states for notes and videos
@@ -85,9 +86,18 @@ const AdminPage = () => {
   // Streams state
   const [streams, setStreams] = useState([])
   const [newStreamName, setNewStreamName] = useState('')
+  const [newStreamCollege, setNewStreamCollege] = useState('')
   const [editingStreamId, setEditingStreamId] = useState(null)
   const [editingStreamName, setEditingStreamName] = useState('')
+  const [editingStreamCollege, setEditingStreamCollege] = useState('')
   const canManageStreams = (user?.role === 'admin')
+
+  // Colleges state
+  const [colleges, setColleges] = useState([])
+  const [newCollegeName, setNewCollegeName] = useState('')
+  const [editingCollegeId, setEditingCollegeId] = useState(null)
+  const [editingCollegeName, setEditingCollegeName] = useState('')
+  const canManageColleges = (user?.role === 'admin')
 
   useEffect(() => {
     const loadStreams = async () => {
@@ -99,14 +109,29 @@ const AdminPage = () => {
         console.error('Failed to fetch streams:', e)
       }
     }
+    const loadColleges = async () => {
+      try {
+        const res = await collegesAPI.getAll()
+        const arr = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+        setColleges(arr)
+      } catch (e) {
+        console.error('Failed to fetch colleges:', e)
+      }
+    }
     loadStreams()
+    loadColleges()
   }, [])
 
   const handleAddStream = async (e) => {
     e.preventDefault()
     const name = (newStreamName || '').trim()
+    const college = (newStreamCollege || '').trim()
     if (!name) {
       setErrorMessage('Please enter a stream name')
+      return
+    }
+    if (!college) {
+      setErrorMessage('Please select a college for this stream')
       return
     }
     if (!canManageStreams) {
@@ -115,9 +140,10 @@ const AdminPage = () => {
     }
     setErrorMessage('')
     try {
-      await streamsAPI.create({ name })
-      setStreams(prev => ([...(Array.isArray(prev) ? prev : []), { name }]))
+      await streamsAPI.create({ name, college })
+      setStreams(prev => ([...(Array.isArray(prev) ? prev : []), { name, college }]))
       setNewStreamName('')
+      setNewStreamCollege('')
       setSuccessMessage('Stream added successfully!')
     } catch (err) {
       setErrorMessage(err.message || 'Failed to add stream')
@@ -127,13 +153,16 @@ const AdminPage = () => {
   const startEditStream = (s) => {
     const id = s?._id || s?.id || s?.name
     const name = s?.name || s?.title || ''
+    const college = s?.college || ''
     setEditingStreamId(id)
     setEditingStreamName(name)
+    setEditingStreamCollege(college)
   }
 
   const cancelEditStream = () => {
     setEditingStreamId(null)
     setEditingStreamName('')
+    setEditingStreamCollege('')
   }
 
   const handleUpdateStream = async (e) => {
@@ -144,15 +173,20 @@ const AdminPage = () => {
     }
     const id = editingStreamId
     const name = (editingStreamName || '').trim()
+    const college = (editingStreamCollege || '').trim()
     if (!id || !name) {
       setErrorMessage('Provide a valid stream name')
       return
     }
+    if (!college) {
+      setErrorMessage('Please select a college for this stream')
+      return
+    }
     try {
-      await streamsAPI.update(id, { name })
+      await streamsAPI.update(id, { name, college })
       setStreams(prev => (Array.isArray(prev) ? prev.map(s => {
         const sid = s?._id || s?.id || s?.name
-        if (sid === id) return { ...s, name }
+        if (sid === id) return { ...s, name, college }
         return s
       }) : prev))
       setSuccessMessage('Stream updated')
@@ -177,6 +211,85 @@ const AdminPage = () => {
       if (editingStreamId === idOrName) cancelEditStream()
     } catch (err) {
       setErrorMessage(err.message || 'Failed to delete stream')
+    }
+  }
+
+  // College CRUD handlers
+  const handleAddCollege = async (e) => {
+    e.preventDefault()
+    const name = (newCollegeName || '').trim()
+    if (!name) {
+      setErrorMessage('Please enter a college name')
+      return
+    }
+    if (!canManageColleges) {
+      setErrorMessage('Admins only: cannot add colleges')
+      return
+    }
+    setErrorMessage('')
+    try {
+      await collegesAPI.create({ name })
+      setColleges(prev => ([...(Array.isArray(prev) ? prev : []), { name }]))
+      setNewCollegeName('')
+      setSuccessMessage('College added successfully!')
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to add college')
+    }
+  }
+
+  const startEditCollege = (c) => {
+    const id = c?._id || c?.id || c?.name
+    const name = c?.name || c?.title || ''
+    setEditingCollegeId(id)
+    setEditingCollegeName(name)
+  }
+
+  const cancelEditCollege = () => {
+    setEditingCollegeId(null)
+    setEditingCollegeName('')
+  }
+
+  const handleUpdateCollege = async (e) => {
+    e?.preventDefault?.()
+    if (!canManageColleges) {
+      setErrorMessage('Admins only: cannot update colleges')
+      return
+    }
+    const id = editingCollegeId
+    const name = (editingCollegeName || '').trim()
+    if (!id || !name) {
+      setErrorMessage('Provide a valid college name')
+      return
+    }
+    try {
+      await collegesAPI.update(id, { name })
+      setColleges(prev => (Array.isArray(prev) ? prev.map(c => {
+        const cid = c?._id || c?.id || c?.name
+        if (cid === id) return { ...c, name }
+        return c
+      }) : prev))
+      setSuccessMessage('College updated')
+      cancelEditCollege()
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to update college')
+    }
+  }
+
+  const handleDeleteCollege = async (idOrName) => {
+    if (!canManageColleges) {
+      setErrorMessage('Admins only: cannot delete colleges')
+      return
+    }
+    try {
+      await collegesAPI.delete(idOrName)
+      setColleges(prev => (Array.isArray(prev) ? prev.filter(c => {
+        const cid = c?._id || c?.id || c?.name
+        return cid !== idOrName
+      }) : prev))
+      setSuccessMessage('College deleted')
+      if (editingCollegeId === idOrName) cancelEditCollege()
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to delete college')
     }
   }
 
@@ -607,7 +720,8 @@ const AdminPage = () => {
         description: '',
         year: '',
         subjectType: '',
-        stream: ''
+        stream: '',
+        college: ''
       })
       
       // Refresh subjects data
@@ -641,7 +755,8 @@ const AdminPage = () => {
       description: subject.description || '',
       year: subject.year || '',
       subjectType: subject.subjectType || '',
-      stream: subject.stream || ''
+      stream: subject.stream || '',
+      college: subject.college || ''
     })
   }
 
@@ -837,9 +952,10 @@ const AdminPage = () => {
 
         {/* Content Management Tabs */}
           <Tabs defaultValue="add-subject" className="space-y-6">
-            <TabsList className="grid w-full grid-cols-8">
+            <TabsList className="grid w-full grid-cols-9">
               <TabsTrigger value="add-subject">Add Subject</TabsTrigger>
               <TabsTrigger value="manage-streams">Manage Streams</TabsTrigger>
+              <TabsTrigger value="manage-colleges">Manage Colleges</TabsTrigger>
               <TabsTrigger value="upload-content">Upload Content</TabsTrigger>
               <TabsTrigger value="add-assignment">Assignments</TabsTrigger>
               <TabsTrigger value="manage-content">Manage Content</TabsTrigger>
@@ -871,6 +987,28 @@ const AdminPage = () => {
                       required
                     />
                   </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="stream-college">College</Label>
+                    <Select
+                      value={newStreamCollege || ''}
+                      onValueChange={(value) => setNewStreamCollege(value)}
+                      disabled={!colleges || colleges.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={(!colleges || colleges.length === 0) ? 'No colleges available' : 'Select college'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {(colleges || []).map((c) => {
+                          const name = c?.name || c?.title || (typeof c === 'string' ? c : '')
+                          const key = c?._id || c?.id || name
+                          if (!name) return null
+                          return (
+                            <SelectItem key={key} value={name}>{name}</SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
                   <Button type="submit" className="w-full">
                     <Plus className="h-4 w-4 mr-2" />
                     Add Stream
@@ -885,6 +1023,7 @@ const AdminPage = () => {
                         const key = s?._id || s?.id || name
                         const sid = key
                         const isEditing = editingStreamId === sid
+                        const college = s?.college || ''
                         return (
                           <div key={key} className="flex items-center gap-2">
                             {isEditing ? (
@@ -895,6 +1034,25 @@ const AdminPage = () => {
                                   className="max-w-xs"
                                   disabled={!canManageStreams}
                                 />
+                                <Select
+                                  value={editingStreamCollege || ''}
+                                  onValueChange={(value) => setEditingStreamCollege(value)}
+                                  disabled={!canManageStreams || !Array.isArray(colleges) || colleges.length === 0}
+                                >
+                                  <SelectTrigger className="max-w-xs">
+                                    <SelectValue placeholder={(!colleges || colleges.length === 0) ? 'No colleges available' : 'Select college'} />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {(colleges || []).map((c) => {
+                                      const name = c?.name || c?.title || (typeof c === 'string' ? c : '')
+                                      const key = c?._id || c?.id || name
+                                      if (!name) return null
+                                      return (
+                                        <SelectItem key={key} value={name}>{name}</SelectItem>
+                                      )
+                                    })}
+                                  </SelectContent>
+                                </Select>
                                 <Button size="sm" onClick={handleUpdateStream} disabled={!canManageStreams}>
                                   <Save className="h-4 w-4 mr-1" /> Save
                                 </Button>
@@ -905,6 +1063,7 @@ const AdminPage = () => {
                             ) : (
                               <>
                                 <span className="px-2 py-1 border rounded text-sm">{name}</span>
+                                {college ? <span className="text-xs text-muted-foreground">({college})</span> : null}
                                 {canManageStreams && (
                                   <>
                                     <Button size="sm" variant="ghost" onClick={() => startEditStream(s)}>
@@ -923,6 +1082,88 @@ const AdminPage = () => {
                     </div>
                   ) : (
                     <p className="text-xs text-muted-foreground">No streams yet. Add one above.</p>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Manage Colleges Tab */}
+          <TabsContent value="manage-colleges">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center space-x-2">
+                  <OwlLogo className="h-5 w-5" color="#3b82f6" />
+                  <span>Manage Colleges</span>
+                </CardTitle>
+                <CardDescription>
+                  Add colleges; these appear in Signup and can scope subjects.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleAddCollege} className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="college-name">College Name</Label>
+                    <Input
+                      id="college-name"
+                      placeholder="e.g. ABC Engineering College"
+                      value={newCollegeName}
+                      onChange={(e) => setNewCollegeName(e.target.value)}
+                      required
+                    />
+                  </div>
+                  <Button type="submit" className="w-full">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Add College
+                  </Button>
+                </form>
+                <div className="mt-6">
+                  <h3 className="text-sm font-medium mb-2">Existing Colleges</h3>
+                  {Array.isArray(colleges) && colleges.length > 0 ? (
+                    <div className="space-y-2">
+                      {colleges.map((c) => {
+                        const name = c?.name || c?.title || (typeof c === 'string' ? c : '')
+                        const key = c?._id || c?.id || name
+                        const cid = key
+                        const isEditing = editingCollegeId === cid
+                        return (
+                          <div key={key} className="flex items-center gap-2">
+                            {isEditing ? (
+                              <>
+                                <Input
+                                  value={editingCollegeName}
+                                  onChange={(e) => setEditingCollegeName(e.target.value)}
+                                  className="max-w-xs"
+                                  disabled={!canManageColleges}
+                                />
+                                <Button size="sm" onClick={handleUpdateCollege} disabled={!canManageColleges}>
+                                  <Save className="h-4 w-4 mr-1" /> Save
+                                </Button>
+                                <Button size="sm" variant="outline" onClick={cancelEditCollege}>
+                                  Cancel
+                                </Button>
+                              </>
+                            ) : (
+                              <>
+                                <span className="px-2 py-1 border rounded text-sm">{name}</span>
+                                {canManageColleges && (
+                                  <>
+                                    <Button size="sm" variant="ghost" onClick={() => startEditCollege(c)}>
+                                      <Edit className="h-4 w-4" />
+                                    </Button>
+                                    <Button size="sm" variant="ghost" onClick={() => handleDeleteCollege(cid)}>
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )
+                      })}
+                    </div>
+                  ) : (
+                    <p className="text-xs text-muted-foreground">No colleges yet. Add one above.</p>
                   )}
                 </div>
               </CardContent>
@@ -1108,6 +1349,30 @@ const AdminPage = () => {
                         {(streams || []).map((s) => {
                           const name = s?.name || s?.title || (typeof s === 'string' ? s : '')
                           const key = s?._id || s?.id || name
+                          if (!name) return null
+                          return (
+                            <SelectItem key={key} value={name}>{name}</SelectItem>
+                          )
+                        })}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="subject-college">College</Label>
+                    <Select
+                      value={newSubject.college || ""}
+                      onValueChange={(value) => setNewSubject({ ...newSubject, college: value === "none" ? "" : value })}
+                      disabled={!colleges || colleges.length === 0}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder={(!colleges || colleges.length === 0) ? 'No colleges available' : 'Select college'} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">No college</SelectItem>
+                        {(colleges || []).map((c) => {
+                          const name = c?.name || c?.title || (typeof c === 'string' ? c : '')
+                          const key = c?._id || c?.id || name
                           if (!name) return null
                           return (
                             <SelectItem key={key} value={name}>{name}</SelectItem>
@@ -1342,6 +1607,30 @@ const AdminPage = () => {
                                   {(streams || []).map((s) => {
                                     const name = s?.name || s?.title || (typeof s === 'string' ? s : '')
                                     const key = s?._id || s?.id || name
+                                    if (!name) return null
+                                    return (
+                                      <SelectItem key={key} value={name}>{name}</SelectItem>
+                                    )
+                                  })}
+                                </SelectContent>
+                              </Select>
+                            </div>
+
+                            <div className="space-y-2">
+                              <Label htmlFor={`edit-college-${subject._id || subject.id}`}>College</Label>
+                              <Select
+                                value={editSubject.college || ""}
+                                onValueChange={(value) => setEditSubject({ ...editSubject, college: value === "none" ? "" : value })}
+                                disabled={!colleges || colleges.length === 0}
+                              >
+                                <SelectTrigger>
+                                  <SelectValue placeholder={(!colleges || colleges.length === 0) ? 'No colleges available' : 'Select college'} />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="none">No college</SelectItem>
+                                  {(colleges || []).map((c) => {
+                                    const name = c?.name || c?.title || (typeof c === 'string' ? c : '')
+                                    const key = c?._id || c?.id || name
                                     if (!name) return null
                                     return (
                                       <SelectItem key={key} value={name}>{name}</SelectItem>

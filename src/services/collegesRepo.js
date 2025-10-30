@@ -1,13 +1,8 @@
 import { supabase } from './supabase'
 
-// Streams repository backed by Supabase Database table `streams`
-// Schema suggestion:
-// CREATE TABLE public.streams (
-//   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-//   name text UNIQUE NOT NULL,
-//   created_at timestamptz DEFAULT now()
-// );
-// RLS recommended (see SQL in assistant message).
+// Colleges repository backed by Supabase table `colleges`
+// Schema:
+// id uuid primary key, name text unique not null, active boolean default true, created_at timestamptz default now()
 
 function ensureSupabase() {
   if (!supabase) {
@@ -15,34 +10,32 @@ function ensureSupabase() {
   }
 }
 
-export async function listStreams() {
+export async function listColleges() {
   ensureSupabase()
   const { data, error } = await supabase
-    .from('streams')
+    .from('colleges')
     .select('*')
     .order('name', { ascending: true })
   if (error) throw error
   return data || []
 }
 
-export async function createStream(name, college) {
+export async function createCollege(name) {
   ensureSupabase()
   const { data, error } = await supabase
-    .from('streams')
-    .insert({ name, college })
+    .from('colleges')
+    .insert({ name })
     .select()
     .single()
   if (error) throw error
   return data
 }
 
-export async function updateStream(id, name, college) {
+export async function updateCollege(id, fields) {
   ensureSupabase()
-  const payload = { name }
-  if (college !== undefined) payload.college = college
   const { data, error } = await supabase
-    .from('streams')
-    .update(payload)
+    .from('colleges')
+    .update(fields)
     .eq('id', id)
     .select()
     .single()
@@ -50,10 +43,10 @@ export async function updateStream(id, name, college) {
   return data
 }
 
-export async function deleteStream(id) {
+export async function deleteCollege(id) {
   ensureSupabase()
   const { error } = await supabase
-    .from('streams')
+    .from('colleges')
     .delete()
     .eq('id', id)
   if (error) throw error
