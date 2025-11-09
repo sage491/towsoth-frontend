@@ -144,7 +144,7 @@ export default function TowsothNameSliderSection() {
     <section className="responsive-padding py-12 sm:py-16 bg-gradient-to-r from-blue-600/10 to-purple-600/10">
       <div className="container mx-auto text-center">
         <h2 className="text-3xl sm:text-4xl font-bold mb-8 bg-gradient-to-r from-blue-500 to-purple-400 bg-clip-text text-transparent">
-          Top Performing Students
+          Our Contributors
         </h2>
         <div className="max-w-3xl mx-auto">
           <NameSlider
