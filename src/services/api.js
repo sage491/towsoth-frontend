@@ -2,6 +2,7 @@ import { API_CONFIG } from '@/config/api.js';
 import { readJSONFromSupabase, writeJSONToSupabase } from '@/services/supabase.js'
 import { listStreams, createStream as createStreamDB, updateStream as updateStreamDB, deleteStream as deleteStreamDB } from '@/services/streamsRepo.js'
 import { listColleges, createCollege as createCollegeDB, updateCollege as updateCollegeDB, deleteCollege as deleteCollegeDB } from '@/services/collegesRepo.js'
+import { sanitizeInput, validateEmail, containsSQLInjection } from '@/utils/security.js'
 
 // API Base URL - Using the configured base URL
 const API_BASE_URL = API_CONFIG.BASE_URL;
@@ -41,6 +42,39 @@ class APICache {
 
 const apiCache = new APICache();
 
+// Helper function to sanitize request data before sending to API
+const sanitizeRequestData = (data) => {
+  if (!data || typeof data !== 'object') return data;
+  
+  const sanitized = {};
+  for (const [key, value] of Object.entries(data)) {
+    // Skip password fields from sanitization (but they should be validated)
+    if (key.toLowerCase().includes('password')) {
+      sanitized[key] = value;
+      continue;
+    }
+    
+    if (typeof value === 'string') {
+      // Check for SQL injection attempts
+      if (containsSQLInjection(value)) {
+        console.warn(`Potential SQL injection detected in field: ${key}`);
+      }
+      // Sanitize string inputs
+      sanitized[key] = sanitizeInput(value);
+    } else if (Array.isArray(value)) {
+      sanitized[key] = value.map(item => 
+        typeof item === 'string' ? sanitizeInput(item) : item
+      );
+    } else if (typeof value === 'object' && value !== null) {
+      sanitized[key] = sanitizeRequestData(value);
+    } else {
+      sanitized[key] = value;
+    }
+  }
+  
+  return sanitized;
+};
+
 // Helper function to get auth token
 const getAuthToken = () => {
   return localStorage.getItem('authToken');
@@ -65,6 +99,19 @@ const createHeaders = (includeAuth = true) => {
 // Generic API request function with caching
 const apiRequest = async (endpoint, options = {}) => {
   const url = `${API_BASE_URL}${endpoint}`;
+  
+  // Sanitize request body if present
+  if (options.body && typeof options.body === 'string') {
+    try {
+      const parsedBody = JSON.parse(options.body);
+      const sanitizedBody = sanitizeRequestData(parsedBody);
+      options.body = JSON.stringify(sanitizedBody);
+    } catch (e) {
+      // If body is not JSON, leave it as is
+      console.warn('Could not parse request body for sanitization:', e);
+    }
+  }
+  
   // Build fetch config safely: merge options but normalize cache flag
   const baseConfig = {
     headers: createHeaders(options.auth !== false),

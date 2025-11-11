@@ -9,6 +9,7 @@ import { Eye, EyeOff, Check, X, Loader2 } from 'lucide-react'
 import OwlLogo from '@/components/OwlLogo'
 import { useAuth } from '@/contexts/AuthContext'
 import { authAPI, subjectsAPI, streamsAPI, collegesAPI } from '@/services/api'
+import { validateEmail, validatePassword, sanitizeText } from '@/utils/security'
 
 const SignupPage = () => {
   const [showPassword, setShowPassword] = useState(false)
@@ -85,10 +86,25 @@ const SignupPage = () => {
   const handleSubmit = async (e) => {
     e.preventDefault()
     
+    // Validate email
+    const emailValidation = validateEmail(formData.email)
+    if (!emailValidation.isValid) {
+      setError('Please enter a valid email address')
+      return
+    }
+    
+    // Validate password
+    const passwordValidation = validatePassword(formData.password)
+    if (!passwordValidation.isValid) {
+      setError(passwordValidation.errors[0] || 'Password does not meet requirements')
+      return
+    }
+    
     if (formData.password !== formData.confirmPassword) {
       setError('Passwords do not match!')
       return
     }
+    
     // Require stream selection
     if (!formData.stream) {
       setError('Please select a stream')
@@ -102,7 +118,14 @@ const SignupPage = () => {
       // Remove confirmPassword before sending to API
       const { confirmPassword, ...userData } = formData
       
-      const result = await register(userData)
+      // Sanitize text fields
+      const sanitizedData = {
+        ...userData,
+        name: sanitizeText(userData.name, 100),
+        email: emailValidation.sanitized,
+      }
+      
+      const result = await register(sanitizedData)
       if (result.success) {
         try {
           // Ensure stream is persisted on the profile
