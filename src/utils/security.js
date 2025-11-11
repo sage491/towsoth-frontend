@@ -1,5 +1,5 @@
 import DOMPurify from 'dompurify';
-import validator from 'validator';
+import * as validator from 'validator';
 
 /**
  * Security utilities for input validation and sanitization
