@@ -110,7 +110,7 @@ const ModernLandingPage = () => {
             
             <p className="text-base sm:text-lg lg:text-xl text-muted-foreground mb-6 sm:mb-8 max-w-2xl mx-auto zoom-text">
               A simple yet innovative system built to help students  
-              retain their scholarhsip and 
+              retain their scholarship and 
               master their college exams.
             </p>
             
