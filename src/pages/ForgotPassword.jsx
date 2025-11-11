@@ -4,6 +4,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { authAPI } from '@/services/api'
+import { validateEmail } from '@/utils/security'
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('')
@@ -16,8 +17,17 @@ const ForgotPassword = () => {
     setLoading(true)
     setMessage('')
     setError('')
+    
+    // Validate email format
+    const emailValidation = validateEmail(email)
+    if (!emailValidation.isValid) {
+      setError('Please enter a valid email address')
+      setLoading(false)
+      return
+    }
+    
     try {
-      const res = await authAPI.forgotPassword(email)
+      const res = await authAPI.forgotPassword(emailValidation.sanitized)
       if (res && res.success) {
         setMessage('Check your email for a reset link.')
       } else {
