@@ -17,7 +17,7 @@ const AdminLoginPage = () => {
     password: ''
   })
   const navigate = useNavigate()
-  const { loginAdmin } = useAuth()
+  const { loginAdmin, login } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -25,6 +25,19 @@ const AdminLoginPage = () => {
     setError('')
     
     try {
+      // Try general login first (supports admin in many backends)
+      const generalResult = await login(formData.email, formData.password)
+      if (generalResult.success) {
+        if (generalResult.user?.role === 'admin') {
+          navigate('/admin')
+          return
+        } else {
+          setError('Access denied. Admin privileges required.')
+          return
+        }
+      }
+
+      // Fallback to dedicated admin login endpoint
       const result = await loginAdmin(formData.email, formData.password)
       if (result.success && result.user.role === 'admin') {
         navigate('/admin')

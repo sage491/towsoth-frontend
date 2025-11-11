@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react'
 import * as pdfjsLib from 'pdfjs-dist/build/pdf'
 import pdfWorkerSrc from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+import { Button } from '@/components/ui/button'
+import { ZoomIn, ZoomOut, RotateCcw } from 'lucide-react'
 
 // Configure PDF.js worker (bundler-friendly via ?url)
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc
@@ -8,7 +10,8 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerSrc
 /**
  * Inline PDF.js canvas renderer
  * - Renders each page as a <canvas> stacked vertically
- * - No toolbar, download, print, or zoom controls
+ * - Minimal toolbar with zoom controls (no download/print)
+ * - Supports pinch-to-zoom on touch and trackpad pinch (Ctrl+wheel)
  * - Fits width to container, responsive on resize
  * Props:
  * - url: public URL to the PDF (required)
@@ -20,9 +23,17 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
   const containerRef = useRef(null)
   const pdfRef = useRef(null)
   const canvasMapRef = useRef(new Map()) // pageNumber -> canvas element
+  const pinchDataRef = useRef({ startDistance: 0, startZoom: 1 })
   const [pageNumbers, setPageNumbers] = useState([])
   const [error, setError] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [zoom, setZoom] = useState(1)
+  const [isPinching, setIsPinching] = useState(false)
+  const MIN_ZOOM = 0.5
+  const MAX_ZOOM = 3
+  const ZOOM_STEP = 0.1
+
+  const clampZoom = (z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +z.toFixed(3)))
 
   // Normalize height/maxHeight prop
   const containerMaxHeight = maxHeight ?? (height != null ? (typeof height === 'number' ? `${height}px` : height) : undefined)
@@ -67,7 +78,8 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
 
     const containerWidth = container.clientWidth
     const dpr = Math.max(1, window.devicePixelRatio || 1)
-    const scale = containerWidth / viewport.width
+    const baseScale = containerWidth / viewport.width
+    const scale = baseScale * zoom
     const scaledViewport = page.getViewport({ scale })
 
     const ctx = canvas.getContext('2d')
@@ -81,7 +93,7 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
     await renderTask.promise
   }
 
-  // Render all pages initially and on resize
+  // Render all pages initially and on resize/zoom
   useEffect(() => {
     let ignore = false
     const drawAll = async () => {
@@ -101,12 +113,77 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
       ignore = true
       window.removeEventListener('resize', onResize)
     }
-  }, [pageNumbers])
+  }, [pageNumbers, zoom])
 
   const setCanvasRef = (pageNumber) => (el) => {
     if (!el) return
     canvasMapRef.current.set(pageNumber, el)
   }
+
+  const handleZoomIn = () => setZoom((z) => clampZoom(z + ZOOM_STEP))
+  const handleZoomOut = () => setZoom((z) => clampZoom(z - ZOOM_STEP))
+  const handleResetZoom = () => setZoom(1)
+
+  // Touch pinch and trackpad pinch (Ctrl+wheel) handlers
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el) return
+
+    const getDistance = (touches) => {
+      if (!touches || touches.length < 2) return 0
+      const [t1, t2] = touches
+      const dx = t1.clientX - t2.clientX
+      const dy = t1.clientY - t2.clientY
+      return Math.hypot(dx, dy)
+    }
+
+    const onTouchStart = (e) => {
+      if (e.touches && e.touches.length === 2) {
+        pinchDataRef.current.startDistance = getDistance(e.touches)
+        pinchDataRef.current.startZoom = zoom
+        setIsPinching(true)
+      }
+    }
+
+    const onTouchMove = (e) => {
+      if (!isPinching || !e.touches || e.touches.length < 2) return
+      const dist = getDistance(e.touches)
+      const startDist = pinchDataRef.current.startDistance || 1
+      const startZoom = pinchDataRef.current.startZoom || 1
+      const factor = dist / startDist
+      const nextZoom = clampZoom(startZoom * factor)
+      setZoom(nextZoom)
+      // Prevent browser zoom or scroll-jank during pinch
+      e.preventDefault()
+    }
+
+    const onTouchEnd = (e) => {
+      if (!e.touches || e.touches.length < 2) {
+        setIsPinching(false)
+      }
+    }
+
+    const onWheel = (e) => {
+      // Trackpad pinch usually sends wheel with ctrlKey
+      if (e.ctrlKey) {
+        e.preventDefault()
+        const change = -e.deltaY * 0.0015 // tune sensitivity
+        setZoom((z) => clampZoom(z + change))
+      }
+    }
+
+    el.addEventListener('touchstart', onTouchStart, { passive: true })
+    el.addEventListener('touchmove', onTouchMove, { passive: false })
+    el.addEventListener('touchend', onTouchEnd, { passive: true })
+    el.addEventListener('wheel', onWheel, { passive: false })
+
+    return () => {
+      el.removeEventListener('touchstart', onTouchStart)
+      el.removeEventListener('touchmove', onTouchMove)
+      el.removeEventListener('touchend', onTouchEnd)
+      el.removeEventListener('wheel', onWheel)
+    }
+  }, [zoom, isPinching])
 
   if (error) {
     return (
@@ -118,6 +195,21 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
 
   return (
     <div className={`border border-border rounded-md bg-muted/30 ${className}`} aria-label={title}>
+      <div className="flex items-center justify-between px-4 py-2 border-b border-border bg-background/60 sticky top-0 z-10">
+        <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={handleZoomOut} aria-label="Zoom out">
+            <ZoomOut className="h-4 w-4" />
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleZoomIn} aria-label="Zoom in">
+            <ZoomIn className="h-4 w-4" />
+          </Button>
+          <Button variant="ghost" size="sm" onClick={handleResetZoom} aria-label="Reset zoom">
+            <RotateCcw className="h-4 w-4 mr-2" /> Reset
+          </Button>
+        </div>
+        <div className="text-sm text-muted-foreground">{Math.round(zoom * 100)}%</div>
+      </div>
+
       <div
         ref={containerRef}
         className="w-full p-4 space-y-6"

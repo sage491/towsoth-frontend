@@ -6,7 +6,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useAuth } from '@/contexts/AuthContext'
-import { authAPI, subjectsAPI, setUserProfile } from '@/services/api'
+import { authAPI, subjectsAPI, setUserProfile, streamsAPI, collegesAPI } from '@/services/api'
 import { Badge } from '@/components/ui/badge.jsx'
 import { BookOpen, User, Loader2, Save, ArrowLeft, Trash2 } from 'lucide-react'
 
@@ -20,11 +20,16 @@ const ProfilePage = () => {
   const [subjects, setSubjects] = useState([])
   const [selectedSubjectDetails, setSelectedSubjectDetails] = useState([])
   const [confirmDeleteSubjectId, setConfirmDeleteSubjectId] = useState(null)
+  const [availableStreams, setAvailableStreams] = useState([])
+  const [streamsLoading, setStreamsLoading] = useState(false)
+  const [availableColleges, setAvailableColleges] = useState([])
+  const [collegesLoading, setCollegesLoading] = useState(false)
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     university: '',
     year: '',
+    stream: '',
     selectedSubjects: []
   })
 
@@ -57,6 +62,7 @@ const ProfilePage = () => {
             email: profile.email || '',
             university: profile.university || '',
             year: profile.year || '',
+            stream: profile.stream || '',
             selectedSubjects: (profile.selectedSubjects || []).map(s => {
               if (typeof s === 'string') return s
               return s._id || s.id
@@ -70,24 +76,79 @@ const ProfilePage = () => {
     initProfile()
   }, [user, isLoggedIn, navigate])
   
-  // Fetch subjects by year when changed
+  // Fetch streams list for stream selection
+  useEffect(() => {
+    const fetchStreams = async () => {
+      try {
+        setStreamsLoading(true)
+        const selectedUniversity = (formData.university || '').trim()
+        const hasValidUniversity = selectedUniversity && availableColleges.includes(selectedUniversity)
+        if (!hasValidUniversity) {
+          setAvailableStreams([])
+          return
+        }
+        const res = await streamsAPI.getAll({ college: selectedUniversity })
+        const arr = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+        const names = arr.map((s) => s?.name || s?.title || (typeof s === 'string' ? s : '')).filter(Boolean)
+        setAvailableStreams(names)
+      } catch (e) {
+        console.error('Failed to fetch streams:', e)
+        setAvailableStreams([])
+      } finally {
+        setStreamsLoading(false)
+      }
+    }
+    fetchStreams()
+  }, [formData.university, availableColleges])
+  
+  // Fetch colleges for university dropdown
+  useEffect(() => {
+    const fetchColleges = async () => {
+      try {
+        setCollegesLoading(true)
+        const res = await collegesAPI.getAll()
+        const arr = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : [])
+        const names = arr.map((c) => c?.name || (typeof c === 'string' ? c : '')).filter(Boolean)
+        setAvailableColleges(names)
+      } catch (e) {
+        console.error('Failed to fetch colleges:', e)
+        setAvailableColleges([])
+      } finally {
+        setCollegesLoading(false)
+      }
+    }
+    fetchColleges()
+  }, [])
+  
+  // Fetch and filter subjects by selected stream, year, and VALID university
   useEffect(() => {
     const fetchSubjects = async () => {
       try {
-        let response
-        if (!formData.year) {
-          // Fallback: fetch all subjects so selected ones can still display
-          response = await subjectsAPI.getAll({})
-        } else {
-          response = await subjectsAPI.getAll({ year: formData.year })
+        const selectedUniversity = (formData.university || '').trim()
+        const selectedYear = (formData.year || '').trim()
+        const hasValidUniversity = selectedUniversity && availableColleges.includes(selectedUniversity)
+        if (!hasValidUniversity || !selectedYear) {
+          setSubjects([])
+          return
         }
-        setSubjects(response.data || [])
+        const filters = { year: selectedYear, college: selectedUniversity }
+        const response = await subjectsAPI.getAll(filters)
+        const raw = response?.data ?? (Array.isArray(response) ? response : [])
+        const selectedStream = (formData.stream || '').trim()
+        const fallbackStream = (user?.stream || '').trim()
+        const streamToUse = selectedStream || fallbackStream
+        const filtered = (Array.isArray(raw) ? raw : []).filter((s) => {
+          const sStream = String(s?.stream || '').trim()
+          const matchStream = streamToUse ? sStream === streamToUse : true
+          return matchStream
+        })
+        setSubjects(filtered)
       } catch (err) {
         console.error('Error fetching subjects:', err)
       }
     }
     fetchSubjects()
-  }, [formData.year])
+  }, [formData.year, formData.stream, formData.university, availableColleges])
 
   // Fetch details for currently selected subjects so they always render
   useEffect(() => {
@@ -163,7 +224,13 @@ const ProfilePage = () => {
     setSuccess('')
 
     try {
-      const payload = { year: formData.year, selectedSubjects: normalizeIds(formData.selectedSubjects) }
+      const payload = { 
+        name: formData.name, 
+        university: formData.university, 
+        year: formData.year, 
+        stream: formData.stream, 
+        selectedSubjects: normalizeIds(formData.selectedSubjects) 
+      }
       const response = await authAPI.updateProfile(payload)
       if (response && response.success && response.user) {
         setSuccess('Profile updated successfully!')
@@ -176,7 +243,10 @@ const ProfilePage = () => {
         updateUser(nextUser)
         setFormData(prev => ({
           ...prev,
+          name: response.user.name || prev.name,
+          university: response.user.university || prev.university,
           year: response.user.year || prev.year,
+          stream: response.user.stream || prev.stream,
           selectedSubjects: selectedIds
         }))
       } else {
@@ -278,16 +348,53 @@ const ProfilePage = () => {
               
               <div className="space-y-2">
                 <Label htmlFor="university">University</Label>
-                <Input
-                  id="university"
-                  name="university"
-                  type="text"
-                  placeholder="Enter your university"
+                <Select 
                   value={formData.university}
-                  onChange={handleChange}
-                  disabled={saving}
-                  required
-                />
+                  onValueChange={(value) => handleSelectChange('university', value)}
+                  disabled={saving || collegesLoading || availableColleges.length === 0}
+                >
+                  <SelectTrigger disabled={saving || collegesLoading || availableColleges.length === 0}>
+                    <SelectValue placeholder={collegesLoading ? 'Loading universities...' : (availableColleges.length === 0 ? 'No universities available yet' : 'Select your university')} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableColleges.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {availableColleges.length === 0 && !collegesLoading && (
+                  <p className="text-xs text-muted-foreground">Universities appear when admins add colleges.</p>
+                )}
+              </div>
+              
+              {/* Stream selection */}
+              <div className="space-y-2">
+                <Label htmlFor="stream">Stream</Label>
+                <Select 
+                  value={formData.stream}
+                  onValueChange={(value) => handleSelectChange('stream', value)}
+                  disabled={saving || streamsLoading || availableStreams.length === 0 || !formData.university}
+                >
+                  <SelectTrigger disabled={saving || streamsLoading || availableStreams.length === 0 || !formData.university}>
+                    <SelectValue placeholder={streamsLoading ? 'Loading streams...' : (!formData.university ? 'Select university first' : (availableStreams.length === 0 ? 'No streams available yet' : 'Select your stream'))} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableStreams.map((s) => (
+                      <SelectItem key={s} value={s}>{s}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {availableStreams.length === 0 && !streamsLoading && (
+                  <p className="text-xs text-muted-foreground">Streams appear when admins upload content tied to a stream.</p>
+                )}
+                {formData.stream ? (
+                  <div className="text-xs text-muted-foreground flex items-center gap-2 mt-1">
+                    <span>Selected stream:</span>
+                    <Badge variant="secondary">{formData.stream}</Badge>
+                  </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground mt-1">Please select a stream.</p>
+                )}
               </div>
               
               <div className="space-y-2">
@@ -310,11 +417,14 @@ const ProfilePage = () => {
               </div>
               
               <div className="space-y-3">
+                {(!formData.university || !availableColleges.includes(formData.university)) && (
+                  <p className="text-xs text-gray-500">Select your university to view available subjects.</p>
+                )}
                 {!formData.year && (
                   <p className="text-xs text-gray-500">Select your year to view available subjects.</p>
                 )}
-                {formData.year && subjects.length === 0 && (
-                  <p className="text-sm text-gray-500">No subjects available for the selected year.</p>
+                {formData.year && formData.university && availableColleges.includes(formData.university) && subjects.length === 0 && (
+                  <p className="text-sm text-gray-500">No subjects available for the selected year and university.</p>
                 )}
 
                 {subjects.length > 0 && (
@@ -370,7 +480,7 @@ const ProfilePage = () => {
                           <div className="space-y-2">
                             <Label>Choose Your Subjects</Label>
                             {subjects.length === 0 ? (
-                              <p className="text-xs text-gray-500">No subjects available for the selected year.</p>
+                              <p className="text-xs text-gray-500">No subjects available for the selected year and stream.</p>
                             ) : (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                                 {subjects.map(subject => {

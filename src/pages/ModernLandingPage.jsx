@@ -81,14 +81,9 @@ const ModernLandingPage = () => {
             </nav>
 
             <div className="flex items-center space-x-2 sm:space-x-4 flex-wrap">
-              <Link to="/login" className="hidden sm:block">
-                <Button variant="ghost" className="text-muted-foreground hover:text-foreground touch-target">
-                  Sign In
-                </Button>
-              </Link>
-              <Link to="/signup">
+              <Link to="/login">
                 <Button className="bg-blue-600 hover:bg-blue-700 text-white touch-target text-sm sm:text-base">
-                  Get Started
+                  Sign In
                 </Button>
               </Link>
               <ThemeToggle />
@@ -131,6 +126,8 @@ const ModernLandingPage = () => {
           </div>
         </div>
       </section>
+      
+
 
       {/* The Struggle Is Real Section */}
       <section className="responsive-padding py-12 sm:py-16 bg-muted/50">

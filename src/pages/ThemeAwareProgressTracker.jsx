@@ -40,6 +40,14 @@ const ThemeAwareProgressTracker = () => {
         setLoading(true)
         setError(null)
         
+        // Guard: Only students should call progress endpoints
+        if (!user || user.role !== 'student') {
+          setError('Progress tracking is available to students only.')
+          setSubjects([])
+          setUserProgress(null)
+          return
+        }
+        
         const response = await progressAPI.getDashboardData()
         
         if (response.success) {
