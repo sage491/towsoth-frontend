@@ -25,7 +25,9 @@ import {
   Bell,
   Calendar,
   Settings,
-  Megaphone
+  Megaphone,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react'
 import OwlLogo from '@/components/OwlLogo'
 
@@ -317,6 +319,8 @@ const AdminPage = () => {
   const [subjectNotes, setSubjectNotes] = useState({})
   // Per-subject videos for Manage Content
   const [subjectVideos, setSubjectVideos] = useState({})
+  // Saving order state to prevent duplicate submissions
+  const [savingOrderSubject, setSavingOrderSubject] = useState(null)
 
   const handleDeleteNote = async (subjectId, noteId) => {
     try {
@@ -330,6 +334,57 @@ const AdminPage = () => {
       setSuccessMessage('Note deleted successfully!')
     } catch (err) {
       setErrorMessage(err.message || 'Failed to delete note')
+    }
+  }
+
+  const handleMoveNoteUp = (subjectId, noteId) => {
+    setSubjectNotes(prev => {
+      const current = [...(prev[subjectId] || [])]
+      const idx = current.findIndex(n => (n._id || n.id) === noteId)
+      if (idx > 0) {
+        const tmp = current[idx - 1]
+        current[idx - 1] = current[idx]
+        current[idx] = tmp
+      }
+      return { ...prev, [subjectId]: current }
+    })
+  }
+
+  const handleMoveNoteDown = (subjectId, noteId) => {
+    setSubjectNotes(prev => {
+      const current = [...(prev[subjectId] || [])]
+      const idx = current.findIndex(n => (n._id || n.id) === noteId)
+      if (idx !== -1 && idx < current.length - 1) {
+        const tmp = current[idx + 1]
+        current[idx + 1] = current[idx]
+        current[idx] = tmp
+      }
+      return { ...prev, [subjectId]: current }
+    })
+  }
+
+  const handleSaveNoteOrder = async (subjectId) => {
+    try {
+      setSavingOrderSubject(subjectId)
+      setErrorMessage('')
+      setSuccessMessage('')
+      const items = subjectNotes[subjectId] || []
+      for (let i = 0; i < items.length; i++) {
+        const note = items[i]
+        const id = note._id || note.id
+        await adminAPI.updateNote(id, { orderIndex: i, subject: subjectId })
+      }
+      // Refresh from server to ensure order reflects persisted state
+      try {
+        const res = await notesAPI.getBySubject(subjectId)
+        const data = res && res.data ? res.data : []
+        setSubjectNotes(prev => ({ ...prev, [subjectId]: Array.isArray(data) ? data : [] }))
+      } catch {}
+      setSuccessMessage('Note order updated')
+    } catch (err) {
+      setErrorMessage(err.message || 'Failed to save note order')
+    } finally {
+      setSavingOrderSubject(null)
     }
   }
 
@@ -1652,20 +1707,44 @@ const AdminPage = () => {
                     )}
                     <div className="grid md:grid-cols-2 gap-6">
                       <div>
-                        <h4 className="font-medium mb-3 flex items-center space-x-2">
-                          <FileText className="h-4 w-4" />
-                          <span>
-                            Notes ({(subjectNotes[(subject._id || subject.id)] || []).length})
-                          </span>
-                        </h4>
+                        <div className="flex items-center justify-between mb-3">
+                          <h4 className="font-medium flex items-center space-x-2">
+                            <FileText className="h-4 w-4" />
+                            <span>
+                              Notes ({(subjectNotes[(subject._id || subject.id)] || []).length})
+                            </span>
+                          </h4>
+                          {((subjectNotes[(subject._id || subject.id)] || []).length > 0) && (
+                            <Button
+                              size="sm"
+                              className="flex items-center space-x-2"
+                              onClick={() => handleSaveNoteOrder(subject._id || subject.id)}
+                              disabled={savingOrderSubject === (subject._id || subject.id)}
+                            >
+                              <Save className="h-4 w-4" />
+                              <span>{savingOrderSubject === (subject._id || subject.id) ? 'Saving…' : 'Save Order'}</span>
+                            </Button>
+                          )}
+                        </div>
                         <div className="space-y-2">
                           {((subjectNotes[(subject._id || subject.id)] || []).length > 0) ? (
-                            (subjectNotes[(subject._id || subject.id)]).map((note) => (
+                            (subjectNotes[(subject._id || subject.id)]).map((note, idx) => (
                               <div key={note._id || note.id} className="flex items-center justify-between p-2 bg-muted rounded border">
-                                <span className="text-sm text-muted-foreground">{note.title}</span>
-                                <Button size="sm" variant="ghost" onClick={() => handleDeleteNote(subject._id || subject.id, note._id || note.id)}>
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <div className="flex items-center space-x-3">
+                                  <span className="text-xs text-muted-foreground w-6 text-center">{idx + 1}</span>
+                                  <span className="text-sm text-muted-foreground">{note.title}</span>
+                                </div>
+                                <div className="flex items-center space-x-1">
+                                  <Button size="sm" variant="ghost" onClick={() => handleMoveNoteUp(subject._id || subject.id, note._id || note.id)} title="Move up">
+                                    <ArrowUp className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => handleMoveNoteDown(subject._id || subject.id, note._id || note.id)} title="Move down">
+                                    <ArrowDown className="h-4 w-4" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" onClick={() => handleDeleteNote(subject._id || subject.id, note._id || note.id)} title="Delete">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
                               </div>
                             ))
                           ) : (

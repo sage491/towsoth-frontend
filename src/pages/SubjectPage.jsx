@@ -7,6 +7,7 @@ import { Progress } from '@/components/ui/progress'
 import { useAuth } from '@/contexts/AuthContext'
 import { ThemeContext } from '@/contexts/ThemeContext'
 import { subjectsAPI, notesAPI, videosAPI, progressAPI } from '@/services/api'
+import { downloadFromSupabase } from '@/services/supabase'
 import FloatingElements from '@/components/animations/FloatingElements'
 import { ThemeToggle } from '@/components/ThemeToggle'
 import OwlLogo from '@/components/OwlLogo'
@@ -42,6 +43,7 @@ const SubjectPage = () => {
   const [progressAccessDenied, setProgressAccessDenied] = useState(false)
   const [previewNoteId, setPreviewNoteId] = useState(null)
   const progressFetchSeq = useRef(0)
+  const [downloadingNoteId, setDownloadingNoteId] = useState(null)
   const pendingOpsRef = useRef(new Map())
 
   // Normalize video URLs for embedding (handle YouTube watch/short links)
@@ -193,6 +195,14 @@ const SubjectPage = () => {
 
     setSubject(prev => {
       if (!prev) return prev
+      const needsUpdate = (
+        prev.totalNotes !== totalNotes ||
+        prev.totalVideos !== totalVideos ||
+        prev.completedNotes !== completedNotesCount ||
+        prev.watchedVideos !== watchedVideosCount ||
+        prev.progress !== progressPercent
+      )
+      if (!needsUpdate) return prev
       return {
         ...prev,
         totalNotes,
@@ -202,7 +212,7 @@ const SubjectPage = () => {
         progress: progressPercent,
       }
     })
-  }, [subject, completedItems, subjectNotes, subjectVideos])
+  }, [completedItems, subjectNotes, subjectVideos])
 
   if (loading) {
     return (
@@ -274,6 +284,47 @@ const SubjectPage = () => {
       }
       setCompletedItems(reverted)
       pendingOpsRef.current.delete(key)
+    }
+  }
+
+  const handleDownloadNote = async (note) => {
+    const src = note?.file_url || note?.fileURL
+    if (!src) return
+    try {
+      setDownloadingNoteId(note.id)
+      let blob
+      const isHttp = /^https?:\/\//i.test(src)
+      if (isHttp) {
+        const resp = await fetch(src)
+        if (!resp.ok) throw new Error('Failed to fetch note file')
+        blob = await resp.blob()
+      } else {
+        // Treat as Supabase storage path inside our CONTENT_BUCKET
+        blob = await downloadFromSupabase(src)
+      }
+
+      const url = URL.createObjectURL(blob)
+      const safeTitle = String(note?.title || 'note').replace(/[^a-z0-9_-]+/gi, '_')
+      const extFromType = note?.type === 'pdf' ? 'pdf' : ''
+      const mimeExt = blob.type && blob.type.includes('/') ? blob.type.split('/')[1] : ''
+      const ext = extFromType || mimeExt || 'pdf'
+
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${safeTitle}.${ext}`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+    } catch (e) {
+      console.warn('Download failed:', e)
+      // Fallback: open in new tab if we have an HTTP URL
+      const src = note?.file_url || note?.fileURL
+      if (src && /^https?:\/\//i.test(src)) {
+        window.open(src, '_blank')
+      }
+    } finally {
+      setDownloadingNoteId(null)
     }
   }
 
@@ -417,9 +468,23 @@ const SubjectPage = () => {
                               View
                             </Button>
                             {note.type === 'pdf' && (
-                              <Button size="sm" variant="outline" as="a" href={(note.file_url || note.fileURL)} target="_blank" rel="noopener noreferrer" disabled={!(note.file_url || note.fileURL)}>
-                                <Download className="h-4 w-4 mr-2" />
-                                Download
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDownloadNote(note)}
+                                disabled={!(note.file_url || note.fileURL) || downloadingNoteId === note.id}
+                              >
+                                {downloadingNoteId === note.id ? (
+                                  <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    Downloading...
+                                  </>
+                                ) : (
+                                  <>
+                                    <Download className="h-4 w-4 mr-2" />
+                                    Download
+                                  </>
+                                )}
                               </Button>
                             )}
                             {note.type === 'pdf' && (

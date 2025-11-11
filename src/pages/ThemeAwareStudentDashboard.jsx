@@ -380,10 +380,10 @@ const ThemeAwareStudentDashboard = () => {
               <h2 className="text-2xl font-semibold">Your Subjects</h2>
               <Button 
                 variant="outline" 
-                onClick={() => navigate('/progress')}
+                onClick={() => navigate('/subjects')}
                 className="text-sm"
               >
-                View All Progress
+                View All Subjects
                 <ChevronRight className="h-4 w-4 ml-1" />
               </Button>
             </div>

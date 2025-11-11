@@ -6,6 +6,7 @@ import SignupPage from '@/pages/SignupPage'
 import ThemeAwareStudentDashboard from '@/pages/ThemeAwareStudentDashboard'
 import EnhancedDashboard from '@/pages/EnhancedDashboard'
 import SubjectPage from '@/pages/SubjectPage'
+import SubjectsListPage from '@/pages/SubjectsListPage'
 import NoteViewer from '@/pages/NoteViewer'
 import VideoViewer from '@/pages/VideoViewer'
 import FullscreenPDFViewer from '@/pages/FullscreenPDFViewer'
@@ -63,6 +64,11 @@ function App() {
           <Route path="/enhanced-dashboard" element={
             <ProtectedRoute>
               <EnhancedDashboard />
+            </ProtectedRoute>
+          } />
+          <Route path="/subjects" element={
+            <ProtectedRoute>
+              <SubjectsListPage />
             </ProtectedRoute>
           } />
           <Route path="/subject/:id" element={
