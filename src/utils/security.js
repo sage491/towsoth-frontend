@@ -33,15 +33,20 @@ export const sanitizeHTML = (dirty, config = {}) => {
 export const sanitizeInput = (input) => {
   if (typeof input !== 'string') return '';
   
-  // Remove SQL injection attempts and dangerous characters
-  let sanitized = input
+  // For text inputs, use DOMPurify to handle HTML/script content
+  // ALLOW_DATA_ATTR: false prevents data: URLs
+  const cleaned = DOMPurify.sanitize(input, {
+    ALLOWED_TAGS: [], // No HTML tags allowed
+    ALLOWED_ATTR: [],
+    ALLOW_DATA_ATTR: false,
+  });
+  
+  // Remove SQL injection attempts
+  let sanitized = cleaned
     .replace(/['";\\]/g, '') // Remove quotes and backslashes
     .replace(/--/g, '') // Remove SQL comment syntax
     .replace(/\/\*/g, '') // Remove multi-line comment start
     .replace(/\*\//g, '') // Remove multi-line comment end
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '') // Remove script tags
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .replace(/on\w+\s*=/gi, '') // Remove inline event handlers
     .trim();
   
   return sanitized;
@@ -118,15 +123,16 @@ export const validatePassword = (password) => {
 export const sanitizeText = (text, maxLength = 1000) => {
   if (typeof text !== 'string') return '';
   
-  // Remove HTML tags and dangerous content
-  let sanitized = text
-    .replace(/<[^>]*>/g, '') // Remove all HTML tags
-    .replace(/javascript:/gi, '') // Remove javascript: protocol
-    .trim();
+  // Use DOMPurify to remove all HTML tags and dangerous content
+  const sanitized = DOMPurify.sanitize(text, {
+    ALLOWED_TAGS: [], // No HTML tags allowed
+    ALLOWED_ATTR: [],
+    ALLOW_DATA_ATTR: false,
+  }).trim();
   
   // Limit length
   if (sanitized.length > maxLength) {
-    sanitized = sanitized.substring(0, maxLength);
+    return sanitized.substring(0, maxLength);
   }
   
   return sanitized;
@@ -150,9 +156,14 @@ export const validateURL = (url) => {
     require_protocol: true,
   });
   
-  // Additional check to prevent javascript: and data: protocols
-  const isSafe = !sanitized.toLowerCase().startsWith('javascript:') && 
-                 !sanitized.toLowerCase().startsWith('data:');
+  // Additional check to prevent javascript:, data:, and vbscript: protocols
+  const lowerUrl = sanitized.toLowerCase();
+  const isSafe = !lowerUrl.startsWith('javascript:') && 
+                 !lowerUrl.startsWith('data:') &&
+                 !lowerUrl.startsWith('vbscript:') &&
+                 !lowerUrl.includes('javascript:') &&
+                 !lowerUrl.includes('data:') &&
+                 !lowerUrl.includes('vbscript:');
   
   return {
     isValid: isValid && isSafe,

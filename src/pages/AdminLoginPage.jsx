@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { useAuth } from '@/contexts/AuthContext'
 import { Eye, EyeOff, Shield, Loader2 } from 'lucide-react'
 import OwlLogo from '@/components/OwlLogo'
+import { validateEmail } from '@/utils/security'
 
 const AdminLoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
@@ -24,9 +25,19 @@ const AdminLoginPage = () => {
     setLoading(true)
     setError('')
     
+    // Validate email format
+    const emailValidation = validateEmail(formData.email)
+    if (!emailValidation.isValid) {
+      setError('Please enter a valid email address')
+      setLoading(false)
+      return
+    }
+    
     try {
+      const sanitizedEmail = emailValidation.sanitized
+      
       // Try general login first (supports admin in many backends)
-      const generalResult = await login(formData.email, formData.password)
+      const generalResult = await login(sanitizedEmail, formData.password)
       if (generalResult.success) {
         if (generalResult.user?.role === 'admin') {
           navigate('/admin')
@@ -38,7 +49,7 @@ const AdminLoginPage = () => {
       }
 
       // Fallback to dedicated admin login endpoint
-      const result = await loginAdmin(formData.email, formData.password)
+      const result = await loginAdmin(sanitizedEmail, formData.password)
       if (result.success && result.user.role === 'admin') {
         navigate('/admin')
       } else if (result.success && result.user.role !== 'admin') {
