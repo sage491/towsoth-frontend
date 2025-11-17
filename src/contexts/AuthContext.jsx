@@ -140,6 +140,12 @@ export const AuthProvider = ({ children }) => {
       setUserProfile(userProfile);
       setUser(userProfile);
       setIsLoggedIn(true);
+      try {
+        const uid = userProfile?._id || userProfile?.id || userProfile?.email
+        if (uid) {
+          localStorage.setItem(`onboardingPending:${uid}`, 'true')
+        }
+      } catch {}
       
       return { success: true, user: userProfile };
     } catch (error) {

@@ -52,15 +52,10 @@ const ThemeAwareStudentDashboard = () => {
     const initOnboarding = async () => {
       try {
         const uid = user?._id || user?.id || user?.email
-        const hasCompleted = uid ? localStorage.getItem(`onboardingCompleted:${uid}`) === 'true' : false
-        const needsSelection = !Array.isArray(user?.selectedSubjects) || user.selectedSubjects.filter(Boolean).length === 0 || !user?.year || !user?.stream
-        if (needsSelection && !hasCompleted) {
+        const pending = uid ? localStorage.getItem(`onboardingPending:${uid}`) === 'true' : false
+        if (pending) {
           setShowOnboarding(true)
-          try {
-            const streams = await streamsAPI.getAll()
-            const names = Array.isArray(streams) ? streams.map(s => s?.name || s?.title || (typeof s === 'string' ? s : '')).filter(Boolean) : []
-            setAvailableStreams(names)
-          } catch {}
+          try { localStorage.removeItem(`onboardingPending:${uid}`) } catch {}
           setOnboardingForm(prev => ({
             year: user?.year || prev.year || '',
             stream: user?.stream || prev.stream || '',
@@ -81,7 +76,9 @@ const ThemeAwareStudentDashboard = () => {
           setOnboardingSubjects([])
           return
         }
-        const resp = await subjectsAPI.getAll({ year: yr })
+        const college = (user?.university || '').trim()
+        const filters = college ? { year: yr, college } : { year: yr }
+        const resp = await subjectsAPI.getAll(filters)
         const raw = resp?.data ?? (Array.isArray(resp) ? resp : [])
         const filtered = (Array.isArray(raw) ? raw : []).filter(s => String(s?.stream || '').trim() === str)
         setOnboardingSubjects(filtered)
@@ -429,10 +426,9 @@ const ThemeAwareStudentDashboard = () => {
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Stream</p>
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                      {(availableStreams.length > 0 ? availableStreams : ['CSE','ECE','EEE','ME','CE']).map(s => (
-                        <Button key={s} variant={onboardingForm.stream === s ? 'default' : 'outline'} onClick={() => setOnboardingForm({ ...onboardingForm, stream: s })}>{s}</Button>
-                      ))}
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <span>Selected stream:</span>
+                      <Badge variant="secondary">{onboardingForm.stream || 'Not set'}</Badge>
                     </div>
                   </div>
                   <div className="space-y-2">
@@ -455,7 +451,6 @@ const ThemeAwareStudentDashboard = () => {
                     )}
                   </div>
                   <div className="flex justify-end gap-2 pt-2">
-                    <Button variant="outline" onClick={() => setShowOnboarding(false)} disabled={onboardingSaving}>Later</Button>
                     <Button onClick={saveOnboarding} disabled={onboardingSaving}>
                       {onboardingSaving ? (
                         <>
