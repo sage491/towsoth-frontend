@@ -6,7 +6,7 @@ import { Progress } from '@/components/ui/progress'
 import { Badge } from '@/components/ui/badge.jsx';
 import { useAuth } from '@/contexts/AuthContext'
 import { ThemeContext } from '@/contexts/ThemeContext'
-import { subjectsAPI, progressAPI, authAPI, setUserProfile, notesAPI, videosAPI, announcementsAPI } from '@/services/api';
+import { subjectsAPI, progressAPI, authAPI, setUserProfile, notesAPI, videosAPI, announcementsAPI, streamsAPI } from '@/services/api';
 import { ThemeToggle } from '@/components/ThemeToggle'
 import OwlLogo from '@/components/OwlLogo'
 import { 
@@ -37,12 +37,104 @@ const ThemeAwareStudentDashboard = () => {
   const { theme } = useContext(ThemeContext)
   const [loading, setLoading] = useState(true)
   const [dashboardData, setDashboardData] = useState(null)
-  // Popups removed: subject selection now happens in Profile
+  const [showOnboarding, setShowOnboarding] = useState(false)
+  const [onboardingError, setOnboardingError] = useState('')
+  const [onboardingSaving, setOnboardingSaving] = useState(false)
+  const [availableStreams, setAvailableStreams] = useState([])
+  const [onboardingForm, setOnboardingForm] = useState({ year: '', stream: '', selectedSubjects: [] })
+  const [onboardingSubjects, setOnboardingSubjects] = useState([])
   const [error, setError] = useState(null)
   const [filteredNotes, setFilteredNotes] = useState([])
   const [filteredVideos, setFilteredVideos] = useState([])
   const [announcements, setAnnouncements] = useState([])
-  // No onboarding persistence needed
+  
+  useEffect(() => {
+    const initOnboarding = async () => {
+      try {
+        const uid = user?._id || user?.id || user?.email
+        const hasCompleted = uid ? localStorage.getItem(`onboardingCompleted:${uid}`) === 'true' : false
+        const needsSelection = !Array.isArray(user?.selectedSubjects) || user.selectedSubjects.filter(Boolean).length === 0 || !user?.year || !user?.stream
+        if (needsSelection && !hasCompleted) {
+          setShowOnboarding(true)
+          try {
+            const streams = await streamsAPI.getAll()
+            const names = Array.isArray(streams) ? streams.map(s => s?.name || s?.title || (typeof s === 'string' ? s : '')).filter(Boolean) : []
+            setAvailableStreams(names)
+          } catch {}
+          setOnboardingForm(prev => ({
+            year: user?.year || prev.year || '',
+            stream: user?.stream || prev.stream || '',
+            selectedSubjects: Array.isArray(user?.selectedSubjects) ? user.selectedSubjects.filter(Boolean) : []
+          }))
+        }
+      } catch {}
+    }
+    initOnboarding()
+  }, [user])
+
+  useEffect(() => {
+    const loadSubjects = async () => {
+      try {
+        const yr = (onboardingForm.year || '').trim()
+        const str = (onboardingForm.stream || '').trim()
+        if (!yr || !str) {
+          setOnboardingSubjects([])
+          return
+        }
+        const resp = await subjectsAPI.getAll({ year: yr })
+        const raw = resp?.data ?? (Array.isArray(resp) ? resp : [])
+        const filtered = (Array.isArray(raw) ? raw : []).filter(s => String(s?.stream || '').trim() === str)
+        setOnboardingSubjects(filtered)
+      } catch {
+        setOnboardingSubjects([])
+      }
+    }
+    loadSubjects()
+  }, [onboardingForm.year, onboardingForm.stream])
+
+  const toggleOnboardingSubject = (subjectId) => {
+    setOnboardingForm(prev => {
+      const id = typeof subjectId === 'string' ? subjectId : String(subjectId)
+      const current = Array.isArray(prev.selectedSubjects) ? prev.selectedSubjects.map(x => (typeof x === 'string' ? x : String(x))).filter(Boolean) : []
+      const exists = current.includes(id)
+      return {
+        ...prev,
+        selectedSubjects: exists ? current.filter(x => x !== id) : [...current, id]
+      }
+    })
+  }
+
+  const saveOnboarding = async () => {
+    setOnboardingSaving(true)
+    setOnboardingError('')
+    try {
+      const year = (onboardingForm.year || '').trim()
+      const stream = (onboardingForm.stream || '').trim()
+      const selected = Array.isArray(onboardingForm.selectedSubjects) ? onboardingForm.selectedSubjects.filter(Boolean) : []
+      if (!year || !stream || selected.length === 0) {
+        setOnboardingError('Please select year, stream, and at least one subject.')
+        setOnboardingSaving(false)
+        return
+      }
+      const payload = { year, stream, selectedSubjects: selected }
+      const response = await authAPI.updateProfile(payload)
+      if (response && response.success && response.user) {
+        const nextUser = { ...response.user, selectedSubjects: selected }
+        updateUser(nextUser)
+        const uid = nextUser?._id || nextUser?.id || nextUser?.email
+        if (uid) {
+          try { localStorage.setItem(`onboardingCompleted:${uid}`, 'true') } catch {}
+        }
+        setShowOnboarding(false)
+      } else {
+        throw new Error(response?.message || 'Failed to save selections')
+      }
+    } catch (e) {
+      setOnboardingError('Failed to save. Please try again.')
+    } finally {
+      setOnboardingSaving(false)
+    }
+  }
 
   useEffect(() => {
     const fetchDashboardData = async () => {
@@ -315,7 +407,72 @@ const ThemeAwareStudentDashboard = () => {
 
       {/* Main Content */}
       <main className="container mx-auto responsive-padding">
-        {/* Pop-ups removed. Students manage year and subjects in Profile. */}
+        {showOnboarding && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <Card className="max-w-2xl w-full mx-4">
+              <CardHeader>
+                <CardTitle>Select your year, stream, and subjects</CardTitle>
+                <CardDescription>We’ll personalize your dashboard based on your choices</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {onboardingError && (
+                  <div className="p-3 text-sm text-red-600 bg-red-50 border border-red-200 rounded-md mb-3">{onboardingError}</div>
+                )}
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Year</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {['1st','2nd','3rd','4th'].map(y => (
+                        <Button key={y} variant={onboardingForm.year === y ? 'default' : 'outline'} onClick={() => setOnboardingForm({ ...onboardingForm, year: y })}>{y} Year</Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Stream</p>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {(availableStreams.length > 0 ? availableStreams : ['CSE','ECE','EEE','ME','CE']).map(s => (
+                        <Button key={s} variant={onboardingForm.stream === s ? 'default' : 'outline'} onClick={() => setOnboardingForm({ ...onboardingForm, stream: s })}>{s}</Button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium">Subjects</p>
+                    {onboardingSubjects.length === 0 ? (
+                      <p className="text-xs text-muted-foreground">Select a year and stream to see available subjects.</p>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {onboardingSubjects.map(subject => {
+                          const id = subject._id || subject.id
+                          const isSelected = Array.isArray(onboardingForm.selectedSubjects) && onboardingForm.selectedSubjects.map(x => (typeof x === 'string' ? x : String(x))).includes(String(id))
+                          return (
+                            <label key={id} className="flex items-center space-x-2 p-2 border rounded-md">
+                              <input type="checkbox" checked={isSelected} onChange={() => toggleOnboardingSubject(id)} />
+                              <span className="text-sm">{subject.name}{subject.subjectType ? (<span className="ml-2 text-xs text-muted-foreground">({subject.subjectType})</span>) : null}</span>
+                            </label>
+                          )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                  <div className="flex justify-end gap-2 pt-2">
+                    <Button variant="outline" onClick={() => setShowOnboarding(false)} disabled={onboardingSaving}>Later</Button>
+                    <Button onClick={saveOnboarding} disabled={onboardingSaving}>
+                      {onboardingSaving ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Saving...
+                        </>
+                      ) : (
+                        <>Save Selections</>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+        {/* Pop-up for first-time selection */}
         {/* Welcome Section */}
         <div className="responsive-margin mb-4 sm:mb-8">
           <h1 className="text-2xl sm:text-3xl font-bold mb-2">Welcome back, {user?.name || 'Student'}!</h1>

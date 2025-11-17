@@ -115,10 +115,12 @@ const ModernLandingPage = () => {
             </p>
             
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 justify-center mb-12 sm:mb-16">
-              <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 touch-target text-sm sm:text-base">
-                <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
-                GET STARTED
-              </Button>
+              <Link to="/signup">
+                <Button size="lg" className="bg-blue-600 hover:bg-blue-700 text-white px-6 sm:px-8 py-3 touch-target text-sm sm:text-base">
+                  <Play className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                  GET STARTED
+                </Button>
+              </Link>
               <Button size="lg" variant="outline" className="border-border text-muted-foreground hover:bg-accent px-6 sm:px-8 py-3 touch-target text-sm sm:text-base">
                 LEARN MORE
               </Button>
