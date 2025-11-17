@@ -37,6 +37,8 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
 
   // Normalize height/maxHeight prop
   const containerMaxHeight = maxHeight ?? (height != null ? (typeof height === 'number' ? `${height}px` : height) : undefined)
+  const renderLockRef = useRef(false)
+  const prevScrollRef = useRef(0)
 
   // Load PDF document
   useEffect(() => {
@@ -97,15 +99,19 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
   useEffect(() => {
     let ignore = false
     const drawAll = async () => {
+      const el = containerRef.current
+      const prevTop = el ? el.scrollTop : 0
+      renderLockRef.current = true
       for (const n of pageNumbers) {
         if (ignore) break
         await renderPage(n)
       }
+      renderLockRef.current = false
+      if (el) el.scrollTop = prevTop
     }
     if (pageNumbers.length) drawAll()
 
     const onResize = () => {
-      // Re-render to fit new width
       drawAll()
     }
     window.addEventListener('resize', onResize)
@@ -212,8 +218,8 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
 
       <div
         ref={containerRef}
-        className="w-full p-4 space-y-6"
-        style={containerMaxHeight ? { maxHeight: containerMaxHeight, overflowY: 'auto' } : undefined}
+        className="w-full p-4 space-y-6 flex flex-col items-center"
+        style={containerMaxHeight ? { maxHeight: containerMaxHeight, overflowY: 'auto', overscrollBehavior: 'contain', overflowAnchor: 'none' } : { overscrollBehavior: 'contain', overflowAnchor: 'none' }}
       >
         {loading && (
           <div className="text-sm text-muted-foreground">Loading PDF…</div>
@@ -222,7 +228,7 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
           <div className="text-sm text-muted-foreground">No pages to display.</div>
         )}
         {pageNumbers.map((n) => (
-          <canvas key={n} ref={setCanvasRef(n)} className="w-full block" />
+          <canvas key={n} ref={setCanvasRef(n)} className="block mx-auto" />
         ))}
       </div>
     </div>
