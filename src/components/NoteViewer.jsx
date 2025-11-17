@@ -36,7 +36,7 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
   const clampZoom = (z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +z.toFixed(3)))
 
   // Normalize height/maxHeight prop
-  const containerMaxHeight = maxHeight ?? (height != null ? (typeof height === 'number' ? `${height}px` : height) : undefined)
+  const containerMaxHeight = maxHeight ?? (height != null ? (typeof height === 'number' ? `${height}px` : height) : '85vh')
   const renderLockRef = useRef(false)
   const prevScrollRef = useRef(0)
 
@@ -219,7 +219,11 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
       <div
         ref={containerRef}
         className="w-full p-4 space-y-6 flex flex-col items-center"
-        style={containerMaxHeight ? { maxHeight: containerMaxHeight, overflowY: 'auto', overscrollBehavior: 'contain', overflowAnchor: 'none' } : { overscrollBehavior: 'contain', overflowAnchor: 'none' }}
+        style={
+          containerMaxHeight
+            ? { maxHeight: containerMaxHeight, overflowY: 'auto', overscrollBehavior: 'contain', overflowAnchor: 'none', touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }
+            : { overscrollBehavior: 'contain', overflowAnchor: 'none', touchAction: 'pan-y', WebkitOverflowScrolling: 'touch' }
+        }
       >
         {loading && (
           <div className="text-sm text-muted-foreground">Loading PDF…</div>
