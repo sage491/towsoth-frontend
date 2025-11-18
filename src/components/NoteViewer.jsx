@@ -36,7 +36,7 @@ const NoteViewer = ({ url, title = 'PDF Document', height, maxHeight, className 
   const clampZoom = (z) => Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, +z.toFixed(3)))
 
   // Normalize height/maxHeight prop
-  const containerMaxHeight = maxHeight ?? (height != null ? (typeof height === 'number' ? `${height}px` : height) : '85vh')
+  const containerMaxHeight = maxHeight ?? (height != null ? (typeof height === 'number' ? `${height}px` : height) : null)
   const renderLockRef = useRef(false)
   const prevScrollRef = useRef(0)
 

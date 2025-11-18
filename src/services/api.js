@@ -43,7 +43,11 @@ const apiCache = new APICache();
 
 // Helper function to get auth token
 const getAuthToken = () => {
-  return localStorage.getItem('authToken');
+  try {
+    const sessionToken = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('authToken') : null
+    if (sessionToken) return sessionToken
+  } catch {}
+  return localStorage.getItem('authToken')
 };
 
 // Helper function to create headers with auth
@@ -200,8 +204,10 @@ export const authAPI = {
   },
 
   logout: () => {
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('userProfile');
+    try { sessionStorage.removeItem('authToken') } catch {}
+    try { sessionStorage.removeItem('userProfile') } catch {}
+    try { localStorage.removeItem('authToken') } catch {}
+    try { localStorage.removeItem('userProfile') } catch {}
   },
 
   forgotPassword: async (email) => {
@@ -697,16 +703,40 @@ export const announcementsAPI = {
 };
 
 // Utility functions
-export const setAuthToken = (token) => {
-  localStorage.setItem('authToken', token);
+export const setAuthToken = (token, options = {}) => {
+  const remember = options.remember !== undefined ? options.remember : true
+  if (remember) {
+    try { sessionStorage.removeItem('authToken') } catch {}
+    localStorage.setItem('authToken', token)
+  } else {
+    try { localStorage.removeItem('authToken') } catch {}
+    try { sessionStorage.setItem('authToken', token) } catch {}
+  }
 };
 
-export const setUserProfile = (profile) => {
-  localStorage.setItem('userProfile', JSON.stringify(profile));
+export const setUserProfile = (profile, options = {}) => {
+  let useSession = false
+  if (options.remember !== undefined) {
+    useSession = !options.remember
+  } else {
+    try {
+      useSession = typeof sessionStorage !== 'undefined' && !!sessionStorage.getItem('authToken')
+    } catch { useSession = false }
+  }
+  const serialized = JSON.stringify(profile)
+  if (useSession) {
+    try { sessionStorage.setItem('userProfile', serialized) } catch {}
+  } else {
+    localStorage.setItem('userProfile', serialized)
+  }
 };
 
 export const getUserProfile = () => {
-  const profile = localStorage.getItem('userProfile');
+  let profile = null
+  try { profile = typeof sessionStorage !== 'undefined' ? sessionStorage.getItem('userProfile') : null } catch { profile = null }
+  if (!profile) {
+    profile = localStorage.getItem('userProfile')
+  }
   if (!profile || profile === 'undefined') {
     return null;
   }

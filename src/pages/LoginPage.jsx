@@ -14,6 +14,7 @@ const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [remember, setRemember] = useState(false)
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -29,7 +30,7 @@ const LoginPage = () => {
     
     try {
       // Attempt student login first
-      const studentResult = await login(formData.email, formData.password)
+      const studentResult = await login(formData.email, formData.password, { remember })
       if (studentResult.success && studentResult.user?.role !== 'admin') {
         // If user selected a year during sign in, persist it immediately
         if (formData.year) {
@@ -38,7 +39,7 @@ const LoginPage = () => {
             if (response && response.success && response.user) {
               // Preserve selectedSubjects from login while updating year
               const nextUser = { ...studentResult.user, year: response.user.year || formData.year }
-              setUserProfile(nextUser)
+              setUserProfile(nextUser, { remember })
               updateUser(nextUser)
             }
           } catch (profileErr) {
@@ -48,7 +49,7 @@ const LoginPage = () => {
         navigate('/dashboard')
       } else if (!studentResult.success) {
         // Fallback: try admin login using the same credentials
-        const adminResult = await loginAdmin(formData.email, formData.password)
+        const adminResult = await loginAdmin(formData.email, formData.password, { remember })
         if (adminResult.success && adminResult.user?.role === 'admin') {
           navigate('/admin')
         } else {
@@ -170,6 +171,8 @@ const LoginPage = () => {
                     id="remember"
                     type="checkbox"
                     className="rounded border-gray-300"
+                    checked={remember}
+                    onChange={(e) => setRemember(e.target.checked)}
                   />
                   <Label htmlFor="remember" className="text-sm">
                     Remember me
