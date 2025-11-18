@@ -80,7 +80,7 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const login = async (email, password) => {
+  const login = async (email, password, options = { remember: true }) => {
     try {
       const response = await authAPI.login(email, password);
       
@@ -88,8 +88,8 @@ export const AuthProvider = ({ children }) => {
       if (response.success && response.token && response.user) {
         const { token, user: userProfile } = response;
         
-        setAuthToken(token);
-        setUserProfile(userProfile);
+        setAuthToken(token, options);
+        setUserProfile(userProfile, options);
         setUser(userProfile);
         setIsLoggedIn(true);
         
@@ -103,13 +103,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const loginAdmin = async (email, password) => {
+  const loginAdmin = async (email, password, options = { remember: true }) => {
     try {
       const response = await adminAPI.login(email, password);
       if (response.success && response.token && response.user) {
         const { token, user: userProfile } = response;
-        setAuthToken(token);
-        setUserProfile(userProfile);
+        setAuthToken(token, options);
+        setUserProfile(userProfile, options);
         setUser(userProfile);
         setIsLoggedIn(true);
         // Bridge Supabase auth: sign in if admin
@@ -131,13 +131,13 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (userData) => {
+  const register = async (userData, options = { remember: true }) => {
     try {
       const response = await authAPI.register(userData);
       const { token, user: userProfile } = response;
       
-      setAuthToken(token);
-      setUserProfile(userProfile);
+      setAuthToken(token, options);
+      setUserProfile(userProfile, options);
       setUser(userProfile);
       setIsLoggedIn(true);
       try {
