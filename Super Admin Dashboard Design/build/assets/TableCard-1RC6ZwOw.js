@@ -1,0 +1,2 @@
+import{j as e}from"./index-d3iOMIbK.js";function i({title:r,actions:s,children:d}){return e.jsxs("div",{className:"bg-white border border-[#e8eaed] rounded overflow-hidden",children:[e.jsx("div",{className:"p-5 border-b border-[#e8eaed]",children:e.jsxs("div",{className:"flex items-center justify-between mb-4",children:[e.jsx("h2",{className:"text-[#1f2937]",children:r}),s]})}),d]})}export{i as T};
+//# sourceMappingURL=TableCard-1RC6ZwOw.js.map
