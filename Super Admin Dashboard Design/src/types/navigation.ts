@@ -1,0 +1,15 @@
+export type AppSectionId =
+  | "dashboard"
+  | "institutions"
+  | "plans"
+  | "roles"
+  | "users"
+  | "ai-control"
+  | "compliance"
+  | "billing"
+  | "security"
+  | "analytics"
+  | "config"
+  | "governance"
+  | "logs"
+  | "emergency";
