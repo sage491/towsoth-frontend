@@ -1,0 +1,41 @@
+# Render Blueprint — https://render.com/docs/blueprint-spec
+# From this repo root, connect the repo in Render and use Blueprint, or create Web Services manually:
+# - Docker / Root: backend-spring or LMS-Backend with Dockerfile below
+# - Health: GET https://<service>/api/health
+
+services:
+  - type: web
+    name: towsoth-backend-spring
+    runtime: docker
+    dockerfilePath: backend-spring/Dockerfile
+    dockerContext: backend-spring
+    healthCheckPath: /api/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: MONGODB_URI
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false
+
+  - type: web
+    name: towsoth-lms-backend
+    runtime: docker
+    dockerfilePath: LMS-Backend/Dockerfile
+    dockerContext: LMS-Backend
+    healthCheckPath: /api/health
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: CORS_ALLOWED_ORIGINS
+        sync: false

@@ -1,0 +1,2 @@
+import{j as e}from"./index-d3iOMIbK.js";function x({title:s,description:r,actions:t,className:i=""}){return e.jsx("div",{className:`p-6 border-b border-[#e8eaed] bg-white ${i}`,children:e.jsxs("div",{className:"flex items-center justify-between",children:[e.jsxs("div",{children:[e.jsx("h1",{className:"text-[#1f2937] mb-1",children:s}),e.jsx("p",{className:"text-[13px] text-[#6b7280]",children:r})]}),t]})})}export{x as P};
+//# sourceMappingURL=PanelHeader-D3PKL0Hu.js.map

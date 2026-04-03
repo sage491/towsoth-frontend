@@ -1,0 +1,211 @@
+@import "tailwindcss";
+
+/* Theme Variables - Source of Truth */
+:root {
+  --bg-main: #f9fafb;
+  --bg-secondary: #f5f6f8;
+  --bg-card: #ffffff;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-tertiary: #64748b;
+  --border-soft: #e5e7eb;
+  --border-medium: #cbd5e1;
+  
+  /* Accent Color - Muted Indigo-Violet (Intellectual, Academic-Premium) */
+  --accent-primary: #5B5F8D;
+  --accent-hover: #4A4D73;
+  --accent-soft: rgba(91, 95, 141, 0.1);
+  --accent-border: rgba(91, 95, 141, 0.2);
+  
+  /* Functional Colors (Rare Usage) */
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  
+  --scrollbar-track: #f1f5f9;
+  --scrollbar-thumb: #cbd5e1;
+  --scrollbar-thumb-hover: #94a3b8;
+}
+
+[data-theme="dark"] {
+  --bg-main: #0b1220;
+  --bg-secondary: #0f1729;
+  --bg-card: #111827;
+  --text-primary: #e5e7eb;
+  --text-secondary: #9ca3af;
+  --text-tertiary: #6b7280;
+  --border-soft: #1f2937;
+  --border-medium: #374151;
+  
+  /* Accent Color - Brighter for Dark Mode Contrast */
+  --accent-primary: #8B8FC7;
+  --accent-hover: #A5A8D8;
+  --accent-soft: rgba(139, 143, 199, 0.15);
+  --accent-border: rgba(139, 143, 199, 0.25);
+  
+  /* Functional Colors */
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  
+  --scrollbar-track: #1f2937;
+  --scrollbar-thumb: #374151;
+  --scrollbar-thumb-hover: #4b5563;
+}
+
+/* Warm Study - Low contrast, easy on eyes */
+[data-theme="warm"] {
+  --bg-main: #faf8f5;
+  --bg-secondary: #f5f2ed;
+  --bg-card: #fffdfb;
+  --text-primary: #2d2a26;
+  --text-secondary: #5a5449;
+  --text-tertiary: #78716c;
+  --border-soft: #e5e1d7;
+  --border-medium: #d4cfbc;
+  
+  --accent-primary: #8B7355;
+  --accent-hover: #6F5C42;
+  --accent-soft: rgba(139, 115, 85, 0.1);
+  --accent-border: rgba(139, 115, 85, 0.2);
+  
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  
+  --scrollbar-track: #f1ede5;
+  --scrollbar-thumb: #d4cfbc;
+  --scrollbar-thumb-hover: #b8b3a1;
+}
+
+/* Night Mono - Black/gray only */
+[data-theme="mono"] {
+  --bg-main: #121212;
+  --bg-secondary: #1a1a1a;
+  --bg-card: #242424;
+  --text-primary: #e5e5e5;
+  --text-secondary: #a3a3a3;
+  --text-tertiary: #737373;
+  --border-soft: #2e2e2e;
+  --border-medium: #3d3d3d;
+  
+  --accent-primary: #94a3b8;
+  --accent-hover: #cbd5e1;
+  --accent-soft: rgba(148, 163, 184, 0.12);
+  --accent-border: rgba(148, 163, 184, 0.2);
+  
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  
+  --scrollbar-track: #1a1a1a;
+  --scrollbar-thumb: #3d3d3d;
+  --scrollbar-thumb-hover: #525252;
+}
+
+/* Calm Paper - Off-white, print-like */
+[data-theme="dim"] {
+  --bg-main: #fefefe;
+  --bg-secondary: #f8f8f8;
+  --bg-card: #ffffff;
+  --text-primary: #1a1a1a;
+  --text-secondary: #525252;
+  --text-tertiary: #737373;
+  --border-soft: #e8e8e8;
+  --border-medium: #d0d0d0;
+  
+  --accent-primary: #64748b;
+  --accent-hover: #475569;
+  --accent-soft: rgba(100, 116, 139, 0.08);
+  --accent-border: rgba(100, 116, 139, 0.15);
+  
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  
+  --scrollbar-track: #f5f5f5;
+  --scrollbar-thumb: #d0d0d0;
+  --scrollbar-thumb-hover: #a8a8a8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', 'Roboto', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  transition: background-color 0.2s ease, color 0.2s ease;
+}
+
+/* Enterprise-grade scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--scrollbar-track);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 0;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--scrollbar-thumb-hover);
+}
+
+/* Remove default button styles */
+button {
+  font-family: inherit;
+}
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 200ms ease-out;
+}
+
+/* Ensure inputs match system */
+input {
+  font-family: inherit;
+}
+
+/* Clean focus states */
+button:focus,
+input:focus {
+  outline: none;
+}
+
+/* Disable text selection on UI elements */
+.no-select {
+  -webkit-user-select: none;
+  -ms-user-select: none;
+  user-select: none;
+}
+
+/* Theme Switcher Hover Effect */
+.theme-option-button:hover .theme-option-title {
+  font-weight: 600;
+}
+
+.theme-option-button.active .theme-option-title {
+  font-weight: 600;
+}
